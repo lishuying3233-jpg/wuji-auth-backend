@@ -19,6 +19,7 @@ export default function AdminPage() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("licenses");
   const [query, setQuery] = useState("");
+  const [prefix, setPrefix] = useState("");
   const [note, setNote] = useState("");
   const [duration, setDuration] = useState("365");
   const [batchCount, setCount] = useState("1");
@@ -37,6 +38,7 @@ export default function AdminPage() {
     onSuccess: (data) => {
       toast.success(t("generated", { count: data.codes.length }));
       setNote("");
+      setPrefix("");
       utils.activation.list.invalidate();
     }
   });
@@ -139,6 +141,13 @@ export default function AdminPage() {
           <div className="glass-card p-2 rounded-3xl flex items-center gap-2 shadow-2xl shadow-purple-100/50 border border-white/40 bg-white/40 backdrop-blur-xl">
             <div className="flex items-center gap-2 px-4">
               <Input 
+                placeholder={t("prefix")} 
+                value={prefix} 
+                onChange={(e) => setPrefix(e.target.value.toUpperCase())}
+                className="border-none bg-transparent focus-visible:ring-0 h-10 w-24 text-sm font-bold placeholder:text-slate-300 placeholder:font-normal"
+              />
+              <div className="h-6 w-[1px] bg-slate-100"></div>
+              <Input 
                 placeholder={t("note")} 
                 value={note} 
                 onChange={(e) => setNote(e.target.value)}
@@ -169,7 +178,7 @@ export default function AdminPage() {
               />
             </div>
             <Button 
-              onClick={() => generateMutation.mutate({ note, durationDays: parseInt(duration), count: parseInt(batchCount) })}
+              onClick={() => generateMutation.mutate({ prefix, note, durationDays: parseInt(duration), count: parseInt(batchCount) })}
               disabled={generateMutation.isPending}
               className="rounded-2xl h-11 px-8 bg-slate-800 hover:bg-slate-900 text-white shadow-xl transition-all active:scale-95"
             >
