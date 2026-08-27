@@ -29,7 +29,9 @@ export const activationCodes = mysqlTable("activation_codes", {
   id: int("id").autoincrement().primaryKey(),
   code: varchar("code", { length: 64 }).notNull().unique(),
   status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
-  machineId: varchar("machineId", { length: 128 }),
+  machineId: varchar("machineId", { length: 64 }),
+  durationDays: int("durationDays").default(365).notNull(), // 默认一年
+  expiresAt: timestamp("expiresAt"),
   activatedAt: timestamp("activatedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

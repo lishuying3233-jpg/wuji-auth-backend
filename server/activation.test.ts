@@ -8,7 +8,7 @@ describe("activation.verify", () => {
 
   it("should fail if code does not exist", async () => {
     const caller = appRouter.createCaller({ user: null } as any);
-    const result = await caller.activation.verify({ code: "NON-EXISTENT", machineId: testMachineId });
+    const result = await caller.auth.verify({ code: "NON-EXISTENT", machineId: testMachineId });
     expect(result.success).toBe(false);
     expect(result.message).toBe("激活码不存在");
   });
@@ -18,7 +18,7 @@ describe("activation.verify", () => {
     await db.createActivationCode({ code: testCode, note: "Test" });
     
     const caller = appRouter.createCaller({ user: null } as any);
-    const result = await caller.activation.verify({ code: testCode, machineId: testMachineId });
+    const result = await caller.auth.verify({ code: testCode, machineId: testMachineId });
     
     expect(result.success).toBe(true);
     expect(result.message).toBe("激活成功");
@@ -30,14 +30,14 @@ describe("activation.verify", () => {
 
   it("should fail if bound to another machine", async () => {
     const caller = appRouter.createCaller({ user: null } as any);
-    const result = await caller.activation.verify({ code: testCode, machineId: "OTHER-MACHINE" });
+    const result = await caller.auth.verify({ code: testCode, machineId: "OTHER-MACHINE" });
     expect(result.success).toBe(false);
     expect(result.message).toBe("激活码已绑定到其他设备");
   });
 
   it("should succeed if same machine verifies again", async () => {
     const caller = appRouter.createCaller({ user: null } as any);
-    const result = await caller.activation.verify({ code: testCode, machineId: testMachineId });
+    const result = await caller.auth.verify({ code: testCode, machineId: testMachineId });
     expect(result.success).toBe(true);
   });
 });

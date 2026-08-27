@@ -19,6 +19,12 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    // 客户端：验证激活码
+    verify: publicProcedure
+      .input(z.object({ code: z.string(), machineId: z.string() }))
+      .mutation(async ({ input }) => {
+        return await db.verifyActivationCode(input.code, input.machineId);
+      }),
   }),
 
   activation: router({
@@ -32,13 +38,17 @@ export const appRouter = router({
     
     // 管理端：生成激活码
     generate: protectedProcedure
-      .input(z.object({ note: z.string().optional() }))
+      .input(z.object({ 
+        note: z.string().optional(),
+        durationDays: z.number().default(365)
+      }))
       .mutation(async ({ input, ctx }) => {
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
         const code = `WUJI-${nanoid(16).toUpperCase()}`;
         await db.createActivationCode({
           code,
           note: input.note || null,
+          durationDays: input.durationDays,
         });
         return { code };
       }),
@@ -59,13 +69,6 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
         await db.deleteActivationCode(input.id);
         return { success: true };
-      }),
-      
-    // 客户端：验证激活码
-    verify: publicProcedure
-      .input(z.object({ code: z.string(), machineId: z.string() }))
-      .mutation(async ({ input }) => {
-        return await db.verifyActivationCode(input.code, input.machineId);
       }),
   }),
 });

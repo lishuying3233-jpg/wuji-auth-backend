@@ -137,13 +137,22 @@ export async function verifyActivationCode(code: string, machineId: string) {
   if (ac.machineId && ac.machineId !== machineId) {
     return { success: false, message: "激活码已绑定到其他设备" };
   }
-  
-  if (!ac.machineId) {
-    await db.update(activationCodes).set({ 
-      machineId, 
-      activatedAt: new Date() 
-    }).where(eq(activationCodes.id, ac.id));
+
+  // 检查是否过期
+  if (ac.expiresAt && ac.expiresAt.getTime() < Date.now()) {
+    return { success: false, message: "激活码已过期" };
   }
   
-  return { success: true, message: "激活成功" };
+  if (!ac.machineId) {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + ac.durationDays * 24 * 60 * 60 * 1000);
+    await db.update(activationCodes).set({ 
+      machineId, 
+      activatedAt: now,
+      expiresAt: expiresAt
+    }).where(eq(activationCodes.id, ac.id));
+    return { success: true, message: "激活成功", expiresAt: expiresAt.getTime() };
+  }
+  
+  return { success: true, message: "验证通过", expiresAt: ac.expiresAt?.getTime() };
 }

@@ -1,22 +1,28 @@
 # 无极助手云端授权系统 TODO
 
 ## 1. 后端与数据库 (Phase 1)
-- [ ] 在 `drizzle/schema.ts` 中定义 `activation_codes` 表 (激活码, 状态, 机器码绑定, 时间戳)
-- [ ] 生成并执行数据库迁移 SQL
-- [ ] 在 `server/db.ts` 中添加激活码查询、创建和绑定的辅助函数
+- [x] 在 `drizzle/schema.ts` 中定义 `activation_codes` 表 (激活码, 状态, 机器码绑定, 时间戳)
+- [x] 生成并执行数据库迁移 SQL
+- [x] 在 `server/db.ts` 中添加激活码查询、创建和绑定的辅助函数
 
 ## 2. 管理后台 UI (Phase 2)
-- [ ] 设计梦幻渐变风格的全局 CSS 主题 (`client/src/index.css`)
-- [ ] 实现后台管理页面 (`client/src/pages/Admin.tsx`)：生成激活码、搜索、列表展示
-- [ ] 实现激活码状态切换 (启用/禁用) 和复制功能
-- [ ] 限制管理后台仅管理员 (Owner) 可进入
+- [x] 设计梦幻渐变风格的全局 CSS 主题 (`client/src/index.css`)
+- [x] 实现后台管理页面 (`client/src/pages/Admin.tsx`)：生成激活码、搜索、列表展示
+- [x] 实现激活码状态切换 (启用/禁用) 和复制功能
+- [x] 限制管理后台仅管理员 (Owner) 可进入
 
 ## 3. 联网验证 API (Phase 3)
-- [ ] 在 `server/routers.ts` 中实现 `publicProcedure.auth.verify` 接口
-- [ ] 逻辑：检查码是否存在 -> 检查是否禁用 -> 检查是否已绑定 -> 首次绑定机器码 -> 返回结果
-- [ ] 编写 Vitest 测试确保验证逻辑安全可靠
+- [x] 在 `server/routers.ts` 中实现 `publicProcedure.auth.verify` 接口
+- [x] 逻辑：检查码是否存在 -> 检查是否禁用 -> 检查是否已绑定 -> 首次绑定机器码 -> 返回结果
+- [x] 编写 Vitest 测试确保验证逻辑安全可靠
 
 ## 4. 桌面端联调 (Phase 4)
-- [ ] 修改桌面端 `electron/main.cjs`，将本地验证改为请求云端 API
-- [ ] 更新桌面端激活 UI，显示联网验证状态
-- [ ] 交付最终后台链接与桌面端更新包
+- [x] 修改桌面端 `electron/main.cjs`，将本地验证改为请求云端 API
+- [x] 更新桌面端激活 UI，显示联网验证状态
+- [x] 交付最终后台链接与桌面端更新包
+
+## 5. 授权期限管理 (Phase 5)
+- [x] 在 `drizzle/schema.ts` 中增加 `durationDays` 和 `expiresAt` 字段
+- [x] 更新后台管理页面，增加期限选择 (1, 3, 7, 30, 90, 365 天)
+- [x] 更新验证逻辑：首次激活计算过期时间，后续验证检查是否过期
+- [x] 修改桌面端，在到期后强制重新弹出激活页面
