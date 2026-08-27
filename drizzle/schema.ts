@@ -40,3 +40,16 @@ export const activationCodes = mysqlTable("activation_codes", {
 
 export type ActivationCode = typeof activationCodes.$inferSelect;
 export type InsertActivationCode = typeof activationCodes.$inferInsert;
+
+export const admins = mysqlTable("admins", {
+  id: int("id").autoincrement().primaryKey(),
+  username: varchar("username", { length: 64 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  role: mysqlEnum("role", ["super", "sub"]).default("sub").notNull(),
+  permissions: text("permissions"), // JSON string: ["generate", "delete", "renew", "manage_admins"]
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Admin = typeof admins.$inferSelect;
+export type InsertAdmin = typeof admins.$inferInsert;

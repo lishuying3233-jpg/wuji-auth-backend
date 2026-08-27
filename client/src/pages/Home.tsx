@@ -32,18 +32,19 @@ export default function Home() {
           {loading ? (
             <Loader2 className="animate-spin text-slate-300" />
           ) : !isAuthenticated ? (
-            <Button 
-              onClick={() => startLogin()}
-              className="rounded-2xl h-14 px-10 bg-slate-800 hover:bg-slate-700 text-white shadow-2xl transition-all active:scale-95 group"
-            >
-              管理员登录
-              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-            </Button>
+            <Link href="/login">
+              <Button 
+                className="rounded-2xl h-14 px-10 bg-slate-800 hover:bg-slate-700 text-white shadow-2xl transition-all active:scale-95 group"
+              >
+                管理员登录
+                <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
           ) : (
             <div className="flex flex-col items-center gap-6">
               <div className="flex items-center gap-3 bg-white/50 px-6 py-3 rounded-2xl border border-white/50">
                 <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                <span className="text-sm font-sans tracking-wider text-slate-600">Welcome, {user?.name}</span>
+                <span className="text-sm font-sans tracking-wider text-slate-600">Welcome, {(user as any)?.username || (user as any)?.name || 'Admin'}</span>
               </div>
               
               <div className="flex gap-4">

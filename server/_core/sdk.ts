@@ -287,9 +287,17 @@ class SDKServer {
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
+
+    // 优先从管理员表查找 (独立账号密码登录)
+    if (sessionUserId.startsWith('admin_')) {
+      const adminId = parseInt(sessionUserId.replace('admin_', ''));
+      const admin = await db.getAdminById(adminId);
+      if (!admin) throw ForbiddenError("管理员账号不存在");
+      return { ...admin, openId: sessionUserId } as any;
+    }
+
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
@@ -307,15 +315,9 @@ class SDKServer {
       }
     }
 
-    if (!user) {
-      throw ForbiddenError("User not found");
-    }
+    if (!user) throw ForbiddenError("User not found");
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
-
+    await db.upsertUser({ openId: user.openId, lastSignedIn: signedInAt });
     return user;
   }
 }

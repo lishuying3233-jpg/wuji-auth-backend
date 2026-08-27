@@ -1,6 +1,6 @@
 import { eq, desc, and, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, activationCodes, InsertActivationCode } from "../drizzle/schema";
+import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,6 +89,45 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+// Admin Helpers
+export async function getAdminByUsername(username: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(admins).where(eq(admins.username, username)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAdminById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(admins).where(eq(admins.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createAdmin(admin: InsertAdmin) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(admins).values(admin);
+}
+
+export async function listAdmins() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(admins);
+}
+
+export async function deleteAdmin(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(admins).where(eq(admins.id, id));
+}
+
+export async function updateAdminPermissions(id: number, permissions: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(admins).set({ permissions }).where(eq(admins.id, id));
+}
+
 export async function getActivationCodes(query?: string) {
   const db = await getDb();
   if (!db) return [];
@@ -122,6 +161,23 @@ export async function deleteActivationCode(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(activationCodes).where(eq(activationCodes.id, id));
+}
+
+export async function renewActivationCode(id: number, days: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(activationCodes).where(eq(activationCodes.id, id)).limit(1);
+  if (result.length === 0) return;
+  
+  const ac = result[0];
+  const currentExpiresAt = ac.expiresAt || new Date();
+  const newExpiresAt = new Date(currentExpiresAt.getTime() + days * 24 * 60 * 60 * 1000);
+  
+  await db.update(activationCodes).set({ 
+    expiresAt: newExpiresAt,
+    durationDays: ac.durationDays + days 
+  }).where(eq(activationCodes.id, id));
 }
 
 export async function verifyActivationCode(code: string, machineId: string) {

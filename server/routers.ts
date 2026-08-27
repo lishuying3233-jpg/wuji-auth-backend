@@ -1,25 +1,49 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
+import { eq } from "drizzle-orm";
+import { admins as adminsTable } from "../drizzle/schema";
 import * as db from "./db";
-import { nanoid } from "nanoid";
+import { COOKIE_NAME } from "@shared/const";
+import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
+import { ONE_YEAR_MS } from "@shared/const";
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
-  system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    // 获取当前登录管理员信息
+    me: publicProcedure.query(async ({ ctx }) => {
+      return ctx.user;
+    }),
+
+    // 独立账号密码登录
+    login: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const admin = await db.getAdminByUsername(input.username);
+        if (!admin) throw new TRPCError({ code: "UNAUTHORIZED", message: "账号不存在" });
+        
+        // 简单比对
+        if (admin.passwordHash !== input.password) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "密码错误" });
+        }
+
+        const token = await sdk.createSessionToken(`admin_${admin.id}`, {
+          name: admin.username,
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+        return { success: true, user: { id: admin.id, username: admin.username, role: admin.role } };
+      }),
+
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true };
     }),
-    // 客户端：验证激活码
+
+    // 桌面端联网验证接口 (公开)
     verify: publicProcedure
       .input(z.object({ code: z.string(), machineId: z.string() }))
       .mutation(async ({ input }) => {
@@ -27,50 +51,88 @@ export const appRouter = router({
       }),
   }),
 
+  // 管理员专用接口
   activation: router({
-    // 管理端：获取列表
     list: protectedProcedure
       .input(z.object({ query: z.string().optional() }))
-      .query(async ({ input, ctx }) => {
-        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      .query(async ({ input }) => {
         return await db.getActivationCodes(input.query);
       }),
-    
-    // 管理端：生成激活码
+
     generate: protectedProcedure
       .input(z.object({ 
-        note: z.string().optional(),
-        durationDays: z.number().default(365)
+        note: z.string().optional(), 
+        durationDays: z.number(),
+        count: z.number().default(1) 
       }))
-      .mutation(async ({ input, ctx }) => {
-        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
-        const code = `WUJI-${nanoid(16).toUpperCase()}`;
-        await db.createActivationCode({
-          code,
-          note: input.note || null,
-          durationDays: input.durationDays,
-        });
-        return { code };
+      .mutation(async ({ input }) => {
+        const results = [];
+        for (let i = 0; i < input.count; i++) {
+          const code = `WUJI-${Math.random().toString(36).substring(2, 10).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+          await db.createActivationCode({
+            code,
+            note: input.note,
+            durationDays: input.durationDays,
+            status: 'active'
+          });
+          results.push(code);
+        }
+        return { success: true, codes: results };
       }),
-      
-    // 管理端：更新状态
+
     updateStatus: protectedProcedure
       .input(z.object({ id: z.number(), status: z.enum(['active', 'disabled']) }))
-      .mutation(async ({ input, ctx }) => {
-        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      .mutation(async ({ input }) => {
         await db.updateActivationCodeStatus(input.id, input.status);
         return { success: true };
       }),
-      
-    // 管理端：删除
+
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        if (ctx.user.role !== 'admin') throw new TRPCError({ code: 'FORBIDDEN' });
+      .mutation(async ({ input }) => {
         await db.deleteActivationCode(input.id);
         return { success: true };
       }),
+
+    renew: protectedProcedure
+      .input(z.object({ id: z.number(), days: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.renewActivationCode(input.id, input.days);
+        return { success: true };
+      }),
   }),
+
+  // 管理员账号管理
+  admin: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可管理账号" });
+      return await db.listAdmins();
+    }),
+    create: protectedProcedure
+      .input(z.object({ 
+        username: z.string(), 
+        password: z.string(), 
+        role: z.enum(['super', 'sub']),
+        permissions: z.string().optional() 
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可创建账号" });
+        await db.createAdmin({
+          username: input.username,
+          passwordHash: input.password, 
+          role: input.role,
+          permissions: input.permissions || "[]"
+        });
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可删除账号" });
+        await db.deleteAdmin(input.id);
+        return { success: true };
+      }),
+  })
 });
 
 export type AppRouter = typeof appRouter;
