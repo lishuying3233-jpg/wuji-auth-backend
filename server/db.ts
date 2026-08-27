@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, desc, and, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, activationCodes, InsertActivationCode } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,61 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function getActivationCodes(query?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  if (query) {
+    return await db.select().from(activationCodes)
+      .where(or(
+        like(activationCodes.code, `%${query}%`),
+        like(activationCodes.machineId, `%${query}%`),
+        like(activationCodes.note, `%${query}%`)
+      ))
+      .orderBy(desc(activationCodes.createdAt));
+  }
+  
+  return await db.select().from(activationCodes).orderBy(desc(activationCodes.createdAt));
+}
+
+export async function createActivationCode(data: InsertActivationCode) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(activationCodes).values(data);
+}
+
+export async function updateActivationCodeStatus(id: number, status: 'active' | 'disabled') {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(activationCodes).set({ status }).where(eq(activationCodes.id, id));
+}
+
+export async function deleteActivationCode(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(activationCodes).where(eq(activationCodes.id, id));
+}
+
+export async function verifyActivationCode(code: string, machineId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.select().from(activationCodes).where(eq(activationCodes.code, code)).limit(1);
+  if (result.length === 0) return { success: false, message: "激活码不存在" };
+  
+  const ac = result[0];
+  if (ac.status === 'disabled') return { success: false, message: "激活码已被禁用" };
+  
+  if (ac.machineId && ac.machineId !== machineId) {
+    return { success: false, message: "激活码已绑定到其他设备" };
+  }
+  
+  if (!ac.machineId) {
+    await db.update(activationCodes).set({ 
+      machineId, 
+      activatedAt: new Date() 
+    }).where(eq(activationCodes.id, ac.id));
+  }
+  
+  return { success: true, message: "激活成功" };
+}

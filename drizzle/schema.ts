@@ -25,4 +25,16 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+export const activationCodes = mysqlTable("activation_codes", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 64 }).notNull().unique(),
+  status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
+  machineId: varchar("machineId", { length: 128 }),
+  activatedAt: timestamp("activatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  note: text("note"),
+});
+
+export type ActivationCode = typeof activationCodes.$inferSelect;
+export type InsertActivationCode = typeof activationCodes.$inferInsert;
