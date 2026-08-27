@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import * as db from "./db";
 
 describe("activation.verify", () => {
-  const testCode = "TEST-CODE-123";
+  const testCode = `TEST-CODE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const testMachineId = "MACHINE-ABC-789";
 
   it("should fail if code does not exist", async () => {

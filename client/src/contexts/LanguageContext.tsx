@@ -1,0 +1,243 @@
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+
+export type Locale = "zh-CN" | "en-US";
+
+type TranslationParams = Record<string, string | number>;
+
+type LanguageContextValue = {
+  locale: Locale;
+  languageName: string;
+  setLocale: (locale: Locale) => void;
+  toggleLocale: () => void;
+  t: (key: string, params?: TranslationParams) => string;
+};
+
+const translations: Record<Locale, Record<string, string>> = {
+  "zh-CN": {
+    language: "语言",
+    loading: "加载中",
+    chinese: "中文",
+    english: "English",
+    brand: "无极授权",
+    finis: "完成",
+    adminDashboard: "管理后台",
+    loggedInAs: "当前账号：{name}",
+    logout: "退出登录",
+    cloudAuthorizationControl: "云端授权控制中心",
+    note: "备注",
+    duration: "授权期限",
+    batchCount: "数量",
+    generate: "生成激活码",
+    generating: "正在生成",
+    generated: "成功生成 {count} 个激活码",
+    totalLicenses: "授权码总数",
+    activeDevices: "已激活设备",
+    expired: "已过期",
+    available: "待使用",
+    licenses: "授权码管理",
+    administrators: "管理员管理",
+    all: "全部",
+    active: "有效",
+    unused: "未使用",
+    search: "搜索激活码、机器码或备注",
+    refresh: "刷新",
+    licenseKey: "激活码",
+    status: "状态",
+    hwid: "机器码",
+    expiry: "到期时间",
+    actions: "操作",
+    disabled: "已禁用",
+    activeStatus: "已激活",
+    unusedStatus: "未使用",
+    pending: "未绑定",
+    noExpiry: "不限期",
+    noRecords: "暂无匹配记录",
+    copy: "复制激活码",
+    copied: "激活码已复制",
+    statusUpdated: "状态更新成功",
+    deleted: "删除成功",
+    renew: "续期",
+    renewLicense: "续期授权码",
+    renewDescription: "为授权码 {code} 延长有效期",
+    days: "天",
+    renewSuccess: "续期成功",
+    disable: "禁用授权码",
+    enable: "启用授权码",
+    delete: "删除",
+    deleteConfirm: "确定要删除这个授权码吗？此操作无法撤销。",
+    adminUser: "管理员账号",
+    role: "角色",
+    permissions: "权限",
+    newAdmin: "新建管理员",
+    username: "账号名称",
+    password: "登录密码",
+    superAdmin: "主管理员",
+    subAdmin: "子管理员",
+    createAdmin: "创建管理员",
+    adminCreated: "子管理员创建成功",
+    adminDeleted: "管理员已删除",
+    createAdminHint: "账号用于登录后台，请妥善保存密码。",
+    permissionGenerate: "生成激活码",
+    permissionDelete: "删除激活码",
+    permissionRenew: "续期授权码",
+    permissionManageAdmins: "管理子管理员",
+    secureFooter: "安全、轻盈的云端授权系统",
+    secureProtocol: "安全协议 v0.1.7",
+    homeTitle: "云端授权管理系统",
+    homeSubtitle: "为无极助手提供安全、清晰、可控的授权管理",
+    homeQuote: "在一个安静的控制台中，管理每一份软件授权。",
+    adminLogin: "管理员登录",
+    enterConsole: "进入控制台",
+    welcome: "欢迎，{name}",
+    loginTitle: "后台登录",
+    loginSubtitle: "无极助手云端授权管理",
+    authenticate: "登录管理后台",
+    loginSuccess: "登录成功",
+    loginFailed: "登录失败",
+    enterUsername: "请输入管理员账号",
+    enterPassword: "请输入登录密码",
+    authorizedPersonnel: "仅限授权人员使用",
+    oneDay: "1 天",
+    threeDays: "3 天",
+    sevenDays: "7 天",
+    oneMonth: "1 个月",
+    threeMonths: "3 个月",
+    oneYear: "1 年",
+    renewSevenDays: "+7 天",
+    renewOneMonth: "+30 天",
+    renewOneYear: "+365 天",
+    selectLanguage: "选择语言",
+  },
+  "en-US": {
+    language: "Language",
+    loading: "Loading",
+    chinese: "中文",
+    english: "English",
+    brand: "Wuji Auth",
+    finis: "Finis",
+    adminDashboard: "Admin Dashboard",
+    loggedInAs: "Logged in as {name}",
+    logout: "Log out",
+    cloudAuthorizationControl: "Cloud Authorization Control",
+    note: "Note",
+    duration: "License duration",
+    batchCount: "Quantity",
+    generate: "Generate licenses",
+    generating: "Generating",
+    generated: "Generated {count} license(s)",
+    totalLicenses: "Total licenses",
+    activeDevices: "Active devices",
+    expired: "Expired",
+    available: "Available",
+    licenses: "License management",
+    administrators: "Administrators",
+    all: "All",
+    active: "Active",
+    unused: "Unused",
+    search: "Search license, machine ID, or note",
+    refresh: "Refresh",
+    licenseKey: "License key",
+    status: "Status",
+    hwid: "Machine ID",
+    expiry: "Expiry",
+    actions: "Actions",
+    disabled: "Disabled",
+    activeStatus: "Active",
+    unusedStatus: "Unused",
+    pending: "Pending",
+    noExpiry: "No expiry",
+    noRecords: "No matching records",
+    copy: "Copy license",
+    copied: "License copied",
+    statusUpdated: "Status updated",
+    deleted: "Deleted successfully",
+    renew: "Renew",
+    renewLicense: "Renew license",
+    renewDescription: "Extend authorization for {code}",
+    days: "days",
+    renewSuccess: "Renewed successfully",
+    disable: "Disable license",
+    enable: "Enable license",
+    delete: "Delete",
+    deleteConfirm: "Delete this license? This action cannot be undone.",
+    adminUser: "Admin account",
+    role: "Role",
+    permissions: "Permissions",
+    newAdmin: "New administrator",
+    username: "Username",
+    password: "Password",
+    superAdmin: "Super admin",
+    subAdmin: "Sub admin",
+    createAdmin: "Create administrator",
+    adminCreated: "Sub-admin created",
+    adminDeleted: "Administrator deleted",
+    createAdminHint: "This account will be used to access the console. Store the password securely.",
+    permissionGenerate: "Generate licenses",
+    permissionDelete: "Delete licenses",
+    permissionRenew: "Renew licenses",
+    permissionManageAdmins: "Manage sub-admins",
+    secureFooter: "A secure, light cloud authorization system",
+    secureProtocol: "Secure protocol v0.1.7",
+    homeTitle: "Cloud Authorization Management",
+    homeSubtitle: "Secure, clear, and controlled authorization for Wuji Assistant",
+    homeQuote: "Manage every software authorization from one quiet console.",
+    adminLogin: "Administrator login",
+    enterConsole: "Open console",
+    welcome: "Welcome, {name}",
+    loginTitle: "Console login",
+    loginSubtitle: "Wuji Assistant cloud authorization",
+    authenticate: "Sign in to console",
+    loginSuccess: "Signed in successfully",
+    loginFailed: "Sign-in failed",
+    enterUsername: "Enter administrator username",
+    enterPassword: "Enter password",
+    authorizedPersonnel: "Authorized personnel only",
+    oneDay: "1 day",
+    threeDays: "3 days",
+    sevenDays: "7 days",
+    oneMonth: "1 month",
+    threeMonths: "3 months",
+    oneYear: "1 year",
+    renewSevenDays: "+7 days",
+    renewOneMonth: "+30 days",
+    renewOneYear: "+365 days",
+    selectLanguage: "Select language",
+  },
+};
+
+const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
+
+function interpolate(value: string, params: TranslationParams = {}) {
+  return value.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? `{${key}}`));
+}
+
+export function LanguageProvider({ children, defaultLocale = "zh-CN" }: { children: React.ReactNode; defaultLocale?: Locale }) {
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    if (typeof window === "undefined") return defaultLocale;
+    const stored = window.localStorage.getItem("wuji-admin-locale");
+    return stored === "en-US" || stored === "zh-CN" ? stored : defaultLocale;
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem("wuji-admin-locale", locale);
+    document.documentElement.lang = locale;
+  }, [locale]);
+
+  const value = useMemo<LanguageContextValue>(() => ({
+    locale,
+    languageName: locale === "zh-CN" ? "中文" : "English",
+    setLocale: setLocaleState,
+    toggleLocale: () => setLocaleState(current => current === "zh-CN" ? "en-US" : "zh-CN"),
+    t: (key, params) => interpolate(translations[locale][key] ?? translations["zh-CN"][key] ?? key, params),
+  }), [locale]);
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+export function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error("useLanguage must be used within LanguageProvider");
+  return context;
+}
+
+export const languageMessages = translations;
