@@ -8,6 +8,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { ONE_YEAR_MS } from "@shared/const";
+import { sendTelegramMessage, TG_TEMPLATES } from "./telegram";
 
 export const appRouter = router({
   auth: router({
@@ -97,8 +98,13 @@ export const appRouter = router({
 
     updateStatus: protectedProcedure
       .input(z.object({ id: z.number(), status: z.enum(['active', 'disabled']) }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         await db.updateActivationCodeStatus(input.id, input.status);
+        if (input.status === 'disabled') {
+          const codes = await db.getActivationCodes();
+          const code = codes.find(c => c.id === input.id);
+          if (code) void sendTelegramMessage(TG_TEMPLATES.licenseDisabled(code.code, (ctx.user as any)?.username || "Admin"));
+        }
         return { success: true };
       }),
 
@@ -118,8 +124,11 @@ export const appRouter = router({
 
     renew: protectedProcedure
       .input(z.object({ id: z.number(), days: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
         await db.renewActivationCode(input.id, input.days);
+        const codes = await db.getActivationCodes();
+        const code = codes.find(c => c.id === input.id);
+        if (code) void sendTelegramMessage(TG_TEMPLATES.licenseRenewed(code.code, input.days, (ctx.user as any)?.username || "Admin"));
         return { success: true };
       }),
   }),
@@ -175,7 +184,10 @@ export const appRouter = router({
           const existing = await db.getOrderByTxHash(input.txHash);
           if (existing) throw new TRPCError({ code: "CONFLICT", message: "该交易哈希已被使用" });
         }
-        return await db.createOrder(input);
+        const order = await db.createOrder(input);
+        // 发送 TG 通知
+        void sendTelegramMessage(TG_TEMPLATES.orderCreated({ ...input, id: (order as any).insertId }));
+        return order;
       }),
     getSubscription: publicProcedure
       .input(z.object({ machineId: z.string() }))

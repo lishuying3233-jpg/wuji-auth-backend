@@ -207,16 +207,21 @@ export async function verifyActivationCode(code: string, machineId: string) {
     return { success: false, message: "激活码已过期" };
   }
   
-  if (!ac.machineId) {
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + ac.durationDays * 24 * 60 * 60 * 1000);
-    await db.update(activationCodes).set({ 
-      machineId, 
-      activatedAt: now,
-      expiresAt: expiresAt
-    }).where(eq(activationCodes.id, ac.id));
-    return { success: true, message: "激活成功", expiresAt: expiresAt.getTime() };
-  }
+    if (!ac.machineId) {
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + ac.durationDays * 24 * 60 * 60 * 1000);
+      await db.update(activationCodes).set({ 
+        machineId, 
+        activatedAt: now,
+        expiresAt: expiresAt
+      }).where(eq(activationCodes.id, ac.id));
+      
+      // 发送 TG 通知
+      const { sendTelegramMessage, TG_TEMPLATES } = require("./telegram");
+      void sendTelegramMessage(TG_TEMPLATES.licenseActivated(ac, machineId));
+      
+      return { success: true, message: "激活成功", expiresAt: expiresAt.getTime() };
+    }
   
   return { success: true, message: "验证通过", expiresAt: ac.expiresAt?.getTime() };
 }
