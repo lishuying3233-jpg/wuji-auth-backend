@@ -30,6 +30,7 @@ describe("OrderWorker", () => {
     };
 
     vi.mocked(db.getPendingOrders).mockResolvedValue([mockOrder as any]);
+    vi.mocked(db.claimPendingOrder).mockResolvedValue(true);
     vi.mocked(db.getPaymentSettings).mockResolvedValue([mockSetting as any]);
     vi.mocked(blockchain.verifyTransaction).mockResolvedValue({
       success: true,
@@ -61,6 +62,7 @@ describe("OrderWorker", () => {
     };
 
     vi.mocked(db.getPendingOrders).mockResolvedValue([mockOrder as any]);
+    vi.mocked(db.claimPendingOrder).mockResolvedValue(true);
     vi.mocked(db.getPaymentSettings).mockResolvedValue([{ network: "ERC20", address: "0x_ADDR", status: "active" } as any]);
     vi.mocked(blockchain.verifyTransaction).mockResolvedValue({
       success: false,
@@ -85,6 +87,7 @@ describe("OrderWorker", () => {
     };
 
     vi.mocked(db.getPendingOrders).mockResolvedValue([mockOrder as any]);
+    vi.mocked(db.claimPendingOrder).mockResolvedValue(true);
     vi.mocked(db.getPaymentSettings).mockResolvedValue([{ network: "TRC20", address: "T_ADDR", status: "active" } as any]);
     vi.mocked(blockchain.verifyTransaction).mockResolvedValue({
       success: false,

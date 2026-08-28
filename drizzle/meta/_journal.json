@@ -43,6 +43,13 @@
       "when": 1787921016076,
       "tag": "0005_bright_midnight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787925246566,
+      "tag": "0006_sweet_vargas",
+      "breakpoints": true
     }
   ]
 }

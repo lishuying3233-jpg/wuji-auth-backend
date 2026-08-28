@@ -216,9 +216,12 @@ export async function verifyActivationCode(code: string, machineId: string) {
         expiresAt: expiresAt
       }).where(eq(activationCodes.id, ac.id));
       
-      // 发送 TG 通知
-      const { sendTelegramMessage, TG_TEMPLATES } = require("./telegram");
-      void sendTelegramMessage(TG_TEMPLATES.licenseActivated(ac, machineId));
+      // 发送 TG 通知；测试环境不触发外部副作用
+      if (process.env.NODE_ENV !== "test") {
+        void import("./telegram").then(({ sendTelegramMessage, TG_TEMPLATES }) => {
+          void sendTelegramMessage(TG_TEMPLATES.licenseActivated(ac, machineId));
+        });
+      }
       
       return { success: true, message: "激活成功", expiresAt: expiresAt.getTime() };
     }
@@ -258,6 +261,15 @@ export async function getPendingOrders() {
   const db = await getDb();
   if (!db) return [];
   return await db.select().from(orders).where(and(eq(orders.status, "pending"), isNotNull(orders.txHash)));
+}
+
+export async function claimPendingOrder(id: number) {
+  const db = await getDb();
+  if (!db) return false;
+  const result: any = await db.update(orders)
+    .set({ status: "paid", updatedAt: new Date(), errorReason: null })
+    .where(and(eq(orders.id, id), eq(orders.status, "pending")));
+  return Number(result?.affectedRows || 0) === 1;
 }
 
 export async function getOrderByTxHash(txHash: string) {

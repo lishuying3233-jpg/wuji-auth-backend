@@ -9,6 +9,8 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { ONE_YEAR_MS } from "@shared/const";
 import { sendTelegramMessage, TG_TEMPLATES } from "./telegram";
+import { PLANS } from "../shared/payment_const";
+import { orders as ordersTable } from "../drizzle/schema";
 
 export const appRouter = router({
   auth: router({
@@ -180,9 +182,17 @@ export const appRouter = router({
         txHash: z.string().optional()
       }))
       .mutation(async ({ input }) => {
+        const plan = PLANS.find(p => p.name === input.planName && p.durationDays === input.durationDays && p.price === input.amount);
+        if (!plan) throw new TRPCError({ code: "BAD_REQUEST", message: "套餐参数无效，请重新选择套餐" });
         if (input.txHash) {
-          const existing = await db.getOrderByTxHash(input.txHash);
+          const normalizedTxHash = input.txHash.trim();
+          const validHash = input.network === "ERC20"
+            ? /^0x[a-fA-F0-9]{64}$/.test(normalizedTxHash)
+            : /^[a-fA-F0-9]{64}$/.test(normalizedTxHash);
+          if (!validHash) throw new TRPCError({ code: "BAD_REQUEST", message: "TxHash 格式与支付网络不匹配" });
+          const existing = await db.getOrderByTxHash(normalizedTxHash);
           if (existing) throw new TRPCError({ code: "CONFLICT", message: "该交易哈希已被使用" });
+          input = { ...input, txHash: normalizedTxHash };
         }
         const order = await db.createOrder(input);
         // 发送 TG 通知
@@ -206,7 +216,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db_ = await db.getDb();
         if (!db_) return null;
-        const result = await db_.select().from(require("../drizzle/schema").orders).where(eq(require("../drizzle/schema").orders.id, input.id)).limit(1);
+        const result = await db_.select().from(ordersTable).where(eq(ordersTable.id, input.id)).limit(1);
         return result.length > 0 ? result[0] : null;
       })
   }),

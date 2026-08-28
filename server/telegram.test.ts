@@ -32,6 +32,15 @@ describe("Telegram Notifications", () => {
     expect(message).toContain("CODE-123");
   });
 
+  it("escapes user-controlled fields before HTML delivery", () => {
+    const message = TG_TEMPLATES.orderFailed(
+      { id: 1, machineId: "<HWID>", amount: "1.99" },
+      "<script>alert(1)</script>"
+    );
+    expect(message).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(message).not.toContain("<script>alert(1)</script>");
+  });
+
   it("should call telegram API when sending message", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

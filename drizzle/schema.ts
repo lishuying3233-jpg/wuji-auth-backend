@@ -70,7 +70,7 @@ export const orders = mysqlTable("orders", {
   durationDays: int("durationDays").notNull(),
   amount: varchar("amount", { length: 32 }).notNull(),
   network: mysqlEnum("network", ["ERC20", "TRC20"]).notNull(),
-  txHash: varchar("txHash", { length: 255 }),
+  txHash: varchar("txHash", { length: 255 }).unique(),
   status: mysqlEnum("status", ["pending", "paid", "completed", "failed"]).default("pending").notNull(),
   errorReason: text("errorReason"),
   activationCode: varchar("activationCode", { length: 64 }),

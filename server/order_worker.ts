@@ -13,8 +13,13 @@ export async function processPendingOrders() {
   for (const order of orders) {
     if (!order.txHash) continue;
 
+    // 原子地将 pending 标记为 paid，只有抢占成功的实例可以继续处理。
+    const claimed = await db.claimPendingOrder(order.id);
+    if (!claimed) continue;
+
     const recipientAddress = addressMap.get(order.network);
     if (!recipientAddress) {
+      await db.updateOrderStatus(order.id, "pending", undefined, `未配置 ${order.network} 收款地址`);
       console.warn(`[OrderWorker] No active address for network ${order.network}, skipping order #${order.id}`);
       continue;
     }
