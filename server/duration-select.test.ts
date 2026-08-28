@@ -22,11 +22,11 @@ describe("Admin duration selector", () => {
 
   it("guards generation and reports mutation errors instead of crashing the page", () => {
     expect(adminSource).toContain("const handleGenerate = () =>");
-    expect(adminSource).toContain("toast.error(t(\"invalidPrefix\"))");
-    expect(adminSource).toContain("toast.error(t(\"invalidCount\"))");
+    expect(adminSource).toContain("setGenerationError(t(\"invalidPrefix\"))");
+    expect(adminSource).toContain("setGenerationError(t(\"invalidCount\"))");
     expect(adminSource).toContain("onError: (error) =>");
     expect(adminSource).toContain("window.location.reload()");
-    expect(adminSource).toContain("window.setTimeout(() => window.location.reload(), 250)");
+    expect(adminSource).not.toContain("toast.success(t(\"generated\"");
     expect(adminSource).toContain('data-grammarly="false"');
   });
 });

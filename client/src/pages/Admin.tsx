@@ -24,6 +24,7 @@ export default function AdminPage() {
   const [duration, setDuration] = useState("365");
   const [batchCount, setCount] = useState("1");
   const [filter, setFilter] = useState("all");
+  const [generationError, setGenerationError] = useState("");
   
   const [newAdminUser, setNewAdminUser] = useState("");
   const [newAdminPass, setNewAdminPass] = useState("");
@@ -36,16 +37,12 @@ export default function AdminPage() {
   const { data: admins } = trpc.admin.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
   
   const generateMutation = trpc.activation.generate.useMutation({
-    onSuccess: (data) => {
-      const generatedCount = Array.isArray(data?.codes) ? data.codes.length : 0;
-      toast.success(t("generated", { count: generatedCount }));
-      setNote("");
-      setPrefix("");
-      // 生成成功后刷新完整页面，避免浏览器扩展改写 DOM 导致 React 重排报 insertBefore 错误。
-      window.setTimeout(() => window.location.reload(), 250);
+    onSuccess: () => {
+      // 不创建 toast Portal，也不让 React 立即重排授权码表；生成成功后直接重新加载完整页面。
+      window.location.reload();
     },
     onError: (error) => {
-      toast.error(error.message || t("generationFailed"));
+      setGenerationError(error.message || t("generationFailed"));
     },
   });
 
@@ -54,18 +51,19 @@ export default function AdminPage() {
     const normalizedCount = Number(batchCount);
 
     if (normalizedPrefix && (normalizedPrefix.length > 24 || !/^[A-Z0-9-]+$/.test(normalizedPrefix))) {
-      toast.error(t("invalidPrefix"));
+      setGenerationError(t("invalidPrefix"));
       return;
     }
     if (!supportedDurations.has(duration)) {
-      toast.error(t("invalidDuration"));
+      setGenerationError(t("invalidDuration"));
       return;
     }
     if (!Number.isInteger(normalizedCount) || normalizedCount < 1 || normalizedCount > 50) {
-      toast.error(t("invalidCount"));
+      setGenerationError(t("invalidCount"));
       return;
     }
 
+    setGenerationError("");
     generateMutation.mutate({
       prefix: normalizedPrefix,
       note: note.trim() || undefined,
@@ -169,7 +167,7 @@ export default function AdminPage() {
             </div>
           </div>
           
-          <div className="glass-card p-2 rounded-3xl flex items-center gap-2 shadow-2xl shadow-purple-100/50 border border-white/40 bg-white/40 backdrop-blur-xl">
+          <div className="relative glass-card p-2 rounded-3xl flex items-center gap-2 shadow-2xl shadow-purple-100/50 border border-white/40 bg-white/40 backdrop-blur-xl">
             <div className="flex items-center gap-2 px-4">
               <Input 
                 placeholder={t("prefix")} 
@@ -211,11 +209,22 @@ export default function AdminPage() {
             <Button 
               onClick={handleGenerate}
               disabled={generateMutation.isPending}
+              aria-busy={generateMutation.isPending}
               className="rounded-2xl h-11 px-8 bg-slate-800 hover:bg-slate-900 text-white shadow-xl transition-all active:scale-95"
             >
-              {generateMutation.isPending ? <Loader2 className="animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              <span className="mr-2 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
+                <Plus className={generateMutation.isPending ? "hidden" : "h-4 w-4"} />
+                <Loader2 className={generateMutation.isPending ? "h-4 w-4 animate-spin" : "hidden"} />
+              </span>
               {t("generate")}
             </Button>
+            <p
+              role="alert"
+              aria-live="polite"
+              className={generationError ? "absolute right-2 top-full z-10 mt-2 max-w-xs rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-600 shadow-lg" : "absolute right-2 top-full z-10 mt-2 max-w-xs invisible px-3 py-2 text-[11px]"}
+            >
+              {generationError || "\u00a0"}
+            </p>
           </div>
         </header>
 
