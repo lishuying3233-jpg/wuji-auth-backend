@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [batchCount, setCount] = useState("1");
   const [filter, setFilter] = useState("all");
   const [generationError, setGenerationError] = useState("");
+  const generationInFlight = useRef(false);
   
   const [newAdminUser, setNewAdminUser] = useState("");
   const [newAdminPass, setNewAdminPass] = useState("");
@@ -38,27 +39,35 @@ export default function AdminPage() {
   
   const generateMutation = trpc.activation.generate.useMutation({
     onSuccess: () => {
+      generationInFlight.current = false;
       // 不创建 toast Portal，也不让 React 立即重排授权码表；生成成功后直接重新加载完整页面。
       window.location.reload();
     },
     onError: (error) => {
+      generationInFlight.current = false;
       setGenerationError(error.message || t("generationFailed"));
     },
   });
 
   const handleGenerate = () => {
+    if (generationInFlight.current) return;
+    generationInFlight.current = true;
+
     const normalizedPrefix = prefix.trim().toUpperCase();
     const normalizedCount = Number(batchCount);
 
     if (normalizedPrefix && (normalizedPrefix.length > 24 || !/^[A-Z0-9-]+$/.test(normalizedPrefix))) {
+      generationInFlight.current = false;
       setGenerationError(t("invalidPrefix"));
       return;
     }
     if (!supportedDurations.has(duration)) {
+      generationInFlight.current = false;
       setGenerationError(t("invalidDuration"));
       return;
     }
     if (!Number.isInteger(normalizedCount) || normalizedCount < 1 || normalizedCount > 50) {
+      generationInFlight.current = false;
       setGenerationError(t("invalidCount"));
       return;
     }
@@ -208,14 +217,9 @@ export default function AdminPage() {
             </div>
             <Button 
               onClick={handleGenerate}
-              disabled={generateMutation.isPending}
-              aria-busy={generateMutation.isPending}
               className="rounded-2xl h-11 px-8 bg-slate-800 hover:bg-slate-900 text-white shadow-xl transition-all active:scale-95"
             >
-              <span className="mr-2 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                <Plus className={generateMutation.isPending ? "hidden" : "h-4 w-4"} />
-                <Loader2 className={generateMutation.isPending ? "h-4 w-4 animate-spin" : "hidden"} />
-              </span>
+              <Plus className="mr-2 h-4 w-4" />
               {t("generate")}
             </Button>
             <p
