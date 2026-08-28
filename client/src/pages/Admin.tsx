@@ -29,6 +29,7 @@ export default function AdminPage() {
   const [newAdminPass, setNewAdminPass] = useState("");
   const [newAdminRole, setNewAdminRole] = useState<"super" | "sub">("sub");
   const [newAdminPerms, setNewAdminPerms] = useState<string[]>(["generate", "renew"]);
+  const supportedDurations = new Set(["1", "3", "7", "30", "90", "365"]);
 
   const utils = trpc.useUtils();
   const { data: codes, isLoading, refetch } = trpc.activation.list.useQuery({ query });
@@ -36,12 +37,42 @@ export default function AdminPage() {
   
   const generateMutation = trpc.activation.generate.useMutation({
     onSuccess: (data) => {
-      toast.success(t("generated", { count: data.codes.length }));
+      const generatedCount = Array.isArray(data?.codes) ? data.codes.length : 0;
+      toast.success(t("generated", { count: generatedCount }));
       setNote("");
       setPrefix("");
-      utils.activation.list.invalidate();
-    }
+      // 生成成功后刷新完整页面，避免浏览器扩展改写 DOM 导致 React 重排报 insertBefore 错误。
+      window.setTimeout(() => window.location.reload(), 250);
+    },
+    onError: (error) => {
+      toast.error(error.message || t("generationFailed"));
+    },
   });
+
+  const handleGenerate = () => {
+    const normalizedPrefix = prefix.trim().toUpperCase();
+    const normalizedCount = Number(batchCount);
+
+    if (normalizedPrefix && (normalizedPrefix.length > 24 || !/^[A-Z0-9-]+$/.test(normalizedPrefix))) {
+      toast.error(t("invalidPrefix"));
+      return;
+    }
+    if (!supportedDurations.has(duration)) {
+      toast.error(t("invalidDuration"));
+      return;
+    }
+    if (!Number.isInteger(normalizedCount) || normalizedCount < 1 || normalizedCount > 50) {
+      toast.error(t("invalidCount"));
+      return;
+    }
+
+    generateMutation.mutate({
+      prefix: normalizedPrefix,
+      note: note.trim() || undefined,
+      durationDays: Number(duration),
+      count: normalizedCount,
+    });
+  };
   
   const updateStatusMutation = trpc.activation.updateStatus.useMutation({
     onSuccess: () => {
@@ -108,7 +139,7 @@ export default function AdminPage() {
   const displayName = (user as any)?.username || (user as any)?.name || 'Admin';
 
   return (
-    <div className="min-h-screen bg-transparent">
+    <div className="min-h-screen bg-transparent" data-grammarly="false">
       <div className="container py-12 space-y-10 max-w-6xl mx-auto px-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -178,7 +209,7 @@ export default function AdminPage() {
               />
             </div>
             <Button 
-              onClick={() => generateMutation.mutate({ prefix, note, durationDays: parseInt(duration), count: parseInt(batchCount) })}
+              onClick={handleGenerate}
               disabled={generateMutation.isPending}
               className="rounded-2xl h-11 px-8 bg-slate-800 hover:bg-slate-900 text-white shadow-xl transition-all active:scale-95"
             >

@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { useAuth } from "./_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function ProtectedRoute({ path, component: Component }: { path: string; component: any }) {
   const { isAuthenticated, loading } = useAuth();
@@ -30,14 +31,16 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-50 via-slate-50 to-rose-50">
-      <Switch>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-indigo-50 via-slate-50 to-rose-50">
+        <Switch>
         <Route path="/" component={RootRedirect} />
         <Route path="/home" component={Home} />
         <Route path="/login" component={Login} />
         <ProtectedRoute path="/admin" component={Admin} />
-        <Route component={NotFound} />
-      </Switch>
-    </div>
+          <Route component={NotFound} />
+        </Switch>
+      </div>
+    </ErrorBoundary>
   );
 }
