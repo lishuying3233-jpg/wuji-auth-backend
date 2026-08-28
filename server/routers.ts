@@ -61,16 +61,22 @@ export const appRouter = router({
 
     generate: protectedProcedure
       .input(z.object({ 
-        prefix: z.string().optional(),
+        prefix: z.string()
+          .trim()
+          .max(24, "前缀最多 24 个字符")
+          .refine((value) => value === "" || /^[A-Z0-9-]+$/i.test(value), {
+            message: "前缀只能包含字母、数字和连字符",
+          })
+          .optional(),
         note: z.string().optional(), 
         durationDays: z.number(),
         count: z.number().default(1) 
       }))
       .mutation(async ({ input }) => {
         const results = [];
-        let prefix = (input.prefix || "").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
-        
-        // 如果清洗后为空，或者原本就没填，使用默认随机前缀
+        let prefix = (input.prefix || "").trim().toUpperCase();
+
+        // 未填写前缀时使用默认随机前缀；非法字符已经由 Zod schema 拒绝
         if (!prefix) {
           prefix = Math.random().toString(36).substring(2, 6).toUpperCase();
         }

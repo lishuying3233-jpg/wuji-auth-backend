@@ -154,19 +154,19 @@ export default function AdminPage() {
                 className="border-none bg-transparent focus-visible:ring-0 h-10 w-32 text-sm placeholder:text-slate-300"
               />
               <div className="h-6 w-[1px] bg-slate-100"></div>
-              <Select value={duration} onValueChange={setDuration}>
-                <SelectTrigger className="w-24 border-none bg-transparent h-10 text-xs font-bold text-slate-500 focus:ring-0">
-                  <SelectValue placeholder={t("duration")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">{t("oneDay")}</SelectItem>
-                  <SelectItem value="3">{t("threeDays")}</SelectItem>
-                  <SelectItem value="7">{t("sevenDays")}</SelectItem>
-                  <SelectItem value="30">{t("oneMonth")}</SelectItem>
-                  <SelectItem value="90">{t("threeMonths")}</SelectItem>
-                  <SelectItem value="365">{t("oneYear")}</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                aria-label={t("duration")}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="w-24 h-10 cursor-pointer border-none bg-transparent px-0 text-xs font-bold text-slate-500 outline-none focus:ring-0"
+              >
+                <option value="1">{t("oneDay")}</option>
+                <option value="3">{t("threeDays")}</option>
+                <option value="7">{t("sevenDays")}</option>
+                <option value="30">{t("oneMonth")}</option>
+                <option value="90">{t("threeMonths")}</option>
+                <option value="365">{t("oneYear")}</option>
+              </select>
               <div className="h-6 w-[1px] bg-slate-100"></div>
               <Input 
                 type="number"
