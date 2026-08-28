@@ -599,11 +599,18 @@ export default function AdminPage() {
                         <TableCell className="text-[10px] font-bold text-emerald-600">{order.amount} USDT</TableCell>
                         <TableCell><Badge variant="outline" className="text-[8px]">{order.network}</Badge></TableCell>
                         <TableCell className="max-w-[120px] truncate font-mono text-[9px] text-slate-400" title={order.txHash || ""}>{order.txHash || "-"}</TableCell>
-                        <TableCell>
-                          <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'outline'} className="rounded-full text-[8px] uppercase px-3">
-                            {order.status === 'pending' ? t("pendingAudit") : order.status === 'paid' ? t("paidAudit") : order.status === 'completed' ? t("completedAudit") : t("failedAudit")}
-                          </Badge>
-                        </TableCell>
+<TableCell>
+  <div className="flex flex-col gap-1">
+    <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'outline'} className="rounded-full text-[8px] uppercase px-3 w-fit">
+      {order.status === 'pending' ? t("pendingAudit") : order.status === 'paid' ? t("paidAudit") : order.status === 'completed' ? t("completedAudit") : t("failedAudit")}
+    </Badge>
+    {order.errorReason && (
+      <span className="text-[9px] text-rose-500 leading-tight max-w-[120px] truncate" title={order.errorReason}>
+        {order.errorReason}
+      </span>
+    )}
+  </div>
+</TableCell>
                         <TableCell className="text-right pr-8 space-x-2">
                           {order.status === 'pending' || order.status === 'paid' ? (
                             <>

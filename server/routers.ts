@@ -171,6 +171,10 @@ export const appRouter = router({
         txHash: z.string().optional()
       }))
       .mutation(async ({ input }) => {
+        if (input.txHash) {
+          const existing = await db.getOrderByTxHash(input.txHash);
+          if (existing) throw new TRPCError({ code: "CONFLICT", message: "该交易哈希已被使用" });
+        }
         return await db.createOrder(input);
       }),
     getSubscription: publicProcedure
@@ -184,6 +188,14 @@ export const appRouter = router({
           durationDays: code.durationDays,
           planName: code.durationDays >= 365 ? '年卡' : code.durationDays >= 30 ? '月卡' : '体验卡'
         };
+      }),
+    getOrderStatus: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const db_ = await db.getDb();
+        if (!db_) return null;
+        const result = await db_.select().from(require("../drizzle/schema").orders).where(eq(require("../drizzle/schema").orders.id, input.id)).limit(1);
+        return result.length > 0 ? result[0] : null;
       })
   }),
 

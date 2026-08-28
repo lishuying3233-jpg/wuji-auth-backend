@@ -72,6 +72,7 @@ export const orders = mysqlTable("orders", {
   network: mysqlEnum("network", ["ERC20", "TRC20"]).notNull(),
   txHash: varchar("txHash", { length: 255 }),
   status: mysqlEnum("status", ["pending", "paid", "completed", "failed"]).default("pending").notNull(),
+  errorReason: text("errorReason"),
   activationCode: varchar("activationCode", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

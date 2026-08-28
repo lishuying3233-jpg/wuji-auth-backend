@@ -1,4 +1,4 @@
-import { eq, desc, and, like, or, inArray } from "drizzle-orm";
+import { eq, desc, and, like, or, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin, paymentSettings, orders } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -241,12 +241,25 @@ export async function getOrders() {
   return await db.select().from(orders).orderBy(desc(orders.createdAt));
 }
 
-export async function updateOrderStatus(id: number, status: any, activationCode?: string) {
+export async function updateOrderStatus(id: number, status: any, activationCode?: string, errorReason?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   return await db.update(orders)
-    .set({ status, activationCode, updatedAt: new Date() })
+    .set({ status, activationCode, errorReason, updatedAt: new Date() })
     .where(eq(orders.id, id));
+}
+
+export async function getPendingOrders() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(orders).where(and(eq(orders.status, "pending"), isNotNull(orders.txHash)));
+}
+
+export async function getOrderByTxHash(txHash: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(orders).where(eq(orders.txHash, txHash)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function upsertPaymentSetting(data: any) {
