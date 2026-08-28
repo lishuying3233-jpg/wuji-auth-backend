@@ -154,6 +154,90 @@ export const appRouter = router({
         await db.deleteAdmin(input.id);
         return { success: true };
       }),
+  }),
+
+  // 支付与订购接口 (公开)
+  payment: router({
+    getAddresses: publicProcedure.query(async () => {
+      return await db.getPaymentSettings();
+    }),
+    createOrder: publicProcedure
+      .input(z.object({
+        machineId: z.string(),
+        planName: z.string(),
+        durationDays: z.number(),
+        amount: z.string(),
+        network: z.enum(["ERC20", "TRC20"]),
+        txHash: z.string().optional()
+      }))
+      .mutation(async ({ input }) => {
+        return await db.createOrder(input);
+      }),
+    getSubscription: publicProcedure
+      .input(z.object({ machineId: z.string() }))
+      .query(async ({ input }) => {
+        const code = await db.getActivationCodeByMachineId(input.machineId);
+        if (!code) return { active: false };
+        return {
+          active: code.status === 'active',
+          expiresAt: code.expiresAt?.getTime(),
+          durationDays: code.durationDays,
+          planName: code.durationDays >= 365 ? '年卡' : code.durationDays >= 30 ? '月卡' : '体验卡'
+        };
+      })
+  }),
+
+  // 管理员订单与支付设置接口
+  order: router({
+    list: protectedProcedure.query(async () => {
+      return await db.getOrders();
+    }),
+    listSettings: protectedProcedure.query(async () => {
+      return await db.getPaymentSettings();
+    }),
+    updateStatus: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        status: z.enum(["pending", "paid", "completed", "failed"]),
+        machineId: z.string(),
+        durationDays: z.number()
+      }))
+      .mutation(async ({ input }) => {
+        let activationCode = undefined;
+        if (input.status === 'completed') {
+          // 修正逻辑：设备码后三位仅作为前缀
+          const prefix = input.machineId.slice(-3).toUpperCase();
+          const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+          const finalCode = `${prefix}-${random}`;
+          
+          await db.createActivationCode({
+            code: finalCode,
+            status: 'active',
+            durationDays: input.durationDays,
+            note: `订单自动发码 #${input.id}`
+          });
+          activationCode = finalCode;
+        }
+        await db.updateOrderStatus(input.id, input.status, activationCode);
+        return { success: true, activationCode };
+      }),
+    manageSettings: protectedProcedure
+      .input(z.object({
+        id: z.number().optional(),
+        network: z.enum(["ERC20", "TRC20"]),
+        address: z.string(),
+        status: z.enum(["active", "disabled"])
+      }))
+      .mutation(async ({ input }) => {
+        await db.upsertPaymentSetting(input);
+        return { success: true };
+      }),
+    deleteSetting: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.deletePaymentSetting(input.id);
+        return { success: true };
+      })
   })
 });
 

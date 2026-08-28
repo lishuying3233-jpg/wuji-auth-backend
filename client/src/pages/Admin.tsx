@@ -41,6 +41,11 @@ export default function AdminPage() {
   const utils = trpc.useUtils();
   const { data: codes, isLoading, refetch } = trpc.activation.list.useQuery({ query });
   const { data: admins } = trpc.admin.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
+  const { data: addresses } = trpc.order.listSettings.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
+  const { data: orders } = trpc.order.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
+
+  const [newAddress, setNewAddress] = useState("");
+  const [newNetwork, setNewNetwork] = useState<"ERC20" | "TRC20">("TRC20");
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(searchInput.trim()), 300);
@@ -140,6 +145,29 @@ export default function AdminPage() {
     onSuccess: () => {
       toast.success(t("adminDeleted"));
       utils.admin.list.invalidate();
+    }
+  });
+
+  const manageSettingMutation = trpc.order.manageSettings.useMutation({
+    onSuccess: () => {
+      toast.success(t("statusUpdated"));
+      utils.order.listSettings.invalidate();
+      setNewAddress("");
+    }
+  });
+
+  const deleteSettingMutation = trpc.order.deleteSetting.useMutation({
+    onSuccess: () => {
+      toast.success(t("deleted"));
+      utils.order.listSettings.invalidate();
+    }
+  });
+
+  const updateOrderStatusMutation = trpc.order.updateStatus.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.activationCode ? t("paymentConfirmed") : t("statusUpdated"));
+      utils.order.list.invalidate();
+      utils.activation.list.invalidate();
     }
   });
 
@@ -304,7 +332,13 @@ export default function AdminPage() {
           <div className="flex items-center justify-between">
             <TabsList className="bg-white/40 p-1 rounded-2xl border border-white/60 backdrop-blur-xl shadow-sm">
               <TabsTrigger value="licenses" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("licenses")}</TabsTrigger>
-              {isSuper && <TabsTrigger value="admins" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("administrators")}</TabsTrigger>}
+              {isSuper && (
+                <>
+                  <TabsTrigger value="orders" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("orderManagement")}</TabsTrigger>
+                  <TabsTrigger value="payments" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("paymentManagement")}</TabsTrigger>
+                  <TabsTrigger value="admins" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("administrators")}</TabsTrigger>
+                </>
+              )}
             </TabsList>
             
             {activeTab === "licenses" && (
@@ -530,6 +564,132 @@ export default function AdminPage() {
                           </TableCell>
                           <TableCell className="text-right pr-8">
                             {adm.username !== displayName && <Button variant="ghost" size="icon" onClick={() => deleteAdminMutation.mutate({ id: adm.id })} className="h-8 w-8 rounded-xl text-slate-200 hover:text-rose-500"><Trash2 className="h-4 w-4" /></Button>}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </TabsContent>
+          )}
+
+          {isSuper && (
+            <TabsContent value="orders" className="space-y-6">
+              <div className="glass-card rounded-[2.5rem] overflow-hidden border border-white/60 shadow-xl bg-white/40">
+                <Table>
+                  <TableHeader className="bg-slate-50/20">
+                    <TableRow className="border-none">
+                      <TableHead className="py-6 pl-8 font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("orderTime")}</TableHead>
+                      <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("hwid")}</TableHead>
+                      <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("plan")}</TableHead>
+                      <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("amount")}</TableHead>
+                      <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("network")}</TableHead>
+                      <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("txHash")}</TableHead>
+                      <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("orderStatus")}</TableHead>
+                      <TableHead className="text-right pr-8 font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders?.map(order => (
+                      <TableRow key={order.id} className="group hover:bg-white/60 transition-colors border-white/20">
+                        <TableCell className="pl-8 py-5 text-[10px] text-slate-500">{new Date(order.createdAt).toLocaleString()}</TableCell>
+                        <TableCell className="font-mono text-[10px] text-slate-700">{order.machineId}</TableCell>
+                        <TableCell className="text-[10px] font-bold text-slate-700">{order.planName}</TableCell>
+                        <TableCell className="text-[10px] font-bold text-emerald-600">{order.amount} USDT</TableCell>
+                        <TableCell><Badge variant="outline" className="text-[8px]">{order.network}</Badge></TableCell>
+                        <TableCell className="max-w-[120px] truncate font-mono text-[9px] text-slate-400" title={order.txHash || ""}>{order.txHash || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant={order.status === 'completed' ? 'default' : order.status === 'pending' ? 'secondary' : 'outline'} className="rounded-full text-[8px] uppercase px-3">
+                            {order.status === 'pending' ? t("pendingAudit") : order.status === 'paid' ? t("paidAudit") : order.status === 'completed' ? t("completedAudit") : t("failedAudit")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right pr-8 space-x-2">
+                          {order.status === 'pending' || order.status === 'paid' ? (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => updateOrderStatusMutation.mutate({ id: order.id, status: 'completed', machineId: order.machineId, durationDays: order.durationDays })} className="h-7 text-[9px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg">{t("approve")}</Button>
+                              <Button variant="ghost" size="sm" onClick={() => updateOrderStatusMutation.mutate({ id: order.id, status: 'failed', machineId: order.machineId, durationDays: order.durationDays })} className="h-7 text-[9px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg">{t("reject")}</Button>
+                            </>
+                          ) : order.activationCode && (
+                            <div className="flex items-center justify-end gap-2 text-[9px] text-slate-400">
+                              <span className="font-mono">{order.activationCode}</span>
+                              <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(order.activationCode!); toast.success(t("copied")); }} className="h-6 w-6 rounded-md"><Copy className="w-3 h-3" /></Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+          )}
+
+          {isSuper && (
+            <TabsContent value="payments" className="space-y-6">
+              <div className="grid md:grid-cols-3 gap-8">
+                <div className="space-y-6">
+                  <div className="glass-card p-8 rounded-[2.5rem] border border-white/60 shadow-xl space-y-6 bg-white/40">
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-serif text-slate-800 italic">{t("addAddress")}</h3>
+                      <p className="text-[10px] text-slate-400 leading-relaxed uppercase tracking-widest font-bold">配置 USDT 收款钱包</p>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">{t("network")}</label>
+                        <Select value={newNetwork} onValueChange={(v: any) => setNewNetwork(v)}>
+                          <SelectTrigger className="rounded-2xl border-white/60 bg-white/60 h-12 focus:ring-slate-200">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl border-white/60">
+                            <SelectItem value="TRC20">USDT-TRC20</SelectItem>
+                            <SelectItem value="ERC20">USDT-ERC20</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-bold text-slate-400 uppercase ml-1">{t("address")}</label>
+                        <Input 
+                          placeholder="请输入钱包地址" 
+                          value={newAddress} 
+                          onChange={(e) => setNewAddress(e.target.value)}
+                          className="rounded-2xl border-white/60 bg-white/60 h-12 focus-visible:ring-slate-200"
+                        />
+                      </div>
+                      <Button 
+                        onClick={() => manageSettingMutation.mutate({ network: newNetwork, address: newAddress, status: 'active' })} 
+                        className="w-full rounded-2xl h-12 bg-slate-800 hover:bg-slate-900 shadow-lg mt-4"
+                        disabled={!newAddress}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        {t("addAddress")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="md:col-span-2 glass-card rounded-[2.5rem] overflow-hidden border border-white/60 shadow-xl bg-white/40">
+                  <Table>
+                    <TableHeader className="bg-slate-50/20">
+                      <TableRow className="border-none">
+                        <TableHead className="py-6 pl-8 font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("network")}</TableHead>
+                        <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("address")}</TableHead>
+                        <TableHead className="font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("status")}</TableHead>
+                        <TableHead className="text-right pr-8 font-bold text-slate-400 uppercase tracking-widest text-[9px]">{t("actions")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {addresses?.map(addr => (
+                        <TableRow key={addr.id} className="group hover:bg-white/60 transition-colors border-white/20">
+                          <TableCell className="pl-8 py-5"><Badge variant="outline" className="rounded-full text-[8px] uppercase px-3">{addr.network}</Badge></TableCell>
+                          <TableCell className="font-mono text-xs text-slate-600">{addr.address}</TableCell>
+                          <TableCell>
+                            <Badge variant={addr.status === 'active' ? 'default' : 'secondary'} className="rounded-full text-[8px] uppercase px-3">
+                              {addr.status === 'active' ? t("active") : t("disabled")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right pr-8">
+                            <Button variant="ghost" size="icon" onClick={() => deleteSettingMutation.mutate({ id: addr.id })} className="h-8 w-8 rounded-xl text-slate-200 hover:text-rose-500"><Trash2 className="h-4 w-4" /></Button>
                           </TableCell>
                         </TableRow>
                       ))}

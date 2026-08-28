@@ -53,3 +53,26 @@ export const admins = mysqlTable("admins", {
 
 export type Admin = typeof admins.$inferSelect;
 export type InsertAdmin = typeof admins.$inferInsert;
+
+export const paymentSettings = mysqlTable("payment_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  network: mysqlEnum("network", ["ERC20", "TRC20"]).notNull(),
+  address: varchar("address", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const orders = mysqlTable("orders", {
+  id: int("id").autoincrement().primaryKey(),
+  machineId: varchar("machineId", { length: 64 }).notNull(),
+  planName: varchar("planName", { length: 64 }).notNull(),
+  durationDays: int("durationDays").notNull(),
+  amount: varchar("amount", { length: 32 }).notNull(),
+  network: mysqlEnum("network", ["ERC20", "TRC20"]).notNull(),
+  txHash: varchar("txHash", { length: 255 }),
+  status: mysqlEnum("status", ["pending", "paid", "completed", "failed"]).default("pending").notNull(),
+  activationCode: varchar("activationCode", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});

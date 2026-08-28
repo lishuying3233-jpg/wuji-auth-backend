@@ -1,6 +1,6 @@
 import { eq, desc, and, like, or, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin } from "../drizzle/schema";
+import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin, paymentSettings, orders } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -219,4 +219,57 @@ export async function verifyActivationCode(code: string, machineId: string) {
   }
   
   return { success: true, message: "验证通过", expiresAt: ac.expiresAt?.getTime() };
+}
+
+// Payment & Order Helpers
+export async function getPaymentSettings() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(paymentSettings).where(eq(paymentSettings.status, "active"));
+}
+
+export async function createOrder(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [result] = await db.insert(orders).values(data);
+  return result;
+}
+
+export async function getOrders() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(orders).orderBy(desc(orders.createdAt));
+}
+
+export async function updateOrderStatus(id: number, status: any, activationCode?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.update(orders)
+    .set({ status, activationCode, updatedAt: new Date() })
+    .where(eq(orders.id, id));
+}
+
+export async function upsertPaymentSetting(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (data.id) {
+    return await db.update(paymentSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(paymentSettings.id, data.id));
+  } else {
+    return await db.insert(paymentSettings).values(data);
+  }
+}
+
+export async function deletePaymentSetting(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return await db.delete(paymentSettings).where(eq(paymentSettings.id, id));
+}
+
+export async function getActivationCodeByMachineId(machineId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(activationCodes).where(eq(activationCodes.machineId, machineId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
