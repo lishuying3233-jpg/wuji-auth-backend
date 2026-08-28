@@ -109,6 +109,13 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    deleteMany: protectedProcedure
+      .input(z.object({ ids: z.array(z.number().int().positive()).min(1).max(1000) }))
+      .mutation(async ({ input }) => {
+        await db.deleteActivationCodes(input.ids);
+        return { success: true, deleted: new Set(input.ids).size };
+      }),
+
     renew: protectedProcedure
       .input(z.object({ id: z.number(), days: z.number() }))
       .mutation(async ({ input }) => {

@@ -28,6 +28,29 @@ describe("activation.generate duration flow", () => {
     }
   });
 
+  it("returns unique codes for a real batch generation request", async () => {
+    const caller = appRouter.createCaller({
+      user: { id: 1, username: "batch-duration-test", role: "super" },
+    } as any);
+    const prefix = `B${Date.now().toString(36).toUpperCase()}`;
+    const generated = await caller.activation.generate({
+      prefix,
+      note: "batch generation regression",
+      durationDays: 30,
+      count: 3,
+    });
+
+    expect(generated.success).toBe(true);
+    expect(generated.codes).toHaveLength(3);
+    expect(new Set(generated.codes).size).toBe(3);
+    for (const code of generated.codes) {
+      expect(code).toMatch(new RegExp(`^${prefix}-[A-Z0-9]+$`));
+      const rows = await db.getActivationCodes(code);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].durationDays).toBe(30);
+    }
+  });
+
   it("rejects invalid prefix characters instead of silently rewriting them", async () => {
     const caller = appRouter.createCaller({
       user: { id: 1, username: "prefix-test", role: "super" },

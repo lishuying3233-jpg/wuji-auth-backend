@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,19 +13,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { canSelectVisibleLicenses, clearLicenseSelection, selectedVisibleLicenseCount, toggleLicenseSelection, toggleVisibleLicenseSelection } from "@/lib/licenseSelection";
 
 export default function AdminPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState("licenses");
   const [query, setQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [prefix, setPrefix] = useState("");
   const [note, setNote] = useState("");
   const [duration, setDuration] = useState("365");
   const [batchCount, setCount] = useState("1");
   const [filter, setFilter] = useState("all");
   const [generationError, setGenerationError] = useState("");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectionError, setSelectionError] = useState("");
   const generationInFlight = useRef(false);
+  const batchDeleteInFlight = useRef(false);
   
   const [newAdminUser, setNewAdminUser] = useState("");
   const [newAdminPass, setNewAdminPass] = useState("");
@@ -36,6 +41,11 @@ export default function AdminPage() {
   const utils = trpc.useUtils();
   const { data: codes, isLoading, refetch } = trpc.activation.list.useQuery({ query });
   const { data: admins } = trpc.admin.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(searchInput.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
   
   const generateMutation = trpc.activation.generate.useMutation({
     onSuccess: () => {
@@ -90,9 +100,24 @@ export default function AdminPage() {
   
   const deleteMutation = trpc.activation.delete.useMutation({
     onSuccess: () => {
-      toast.success(t("deleted"));
-      utils.activation.list.invalidate();
-    }
+      window.location.reload();
+    },
+    onError: (error) => {
+      setSelectionError(error.message || t("batchDeleteFailed"));
+    },
+  });
+
+  const batchDeleteMutation = trpc.activation.deleteMany.useMutation({
+    onSuccess: () => {
+      batchDeleteInFlight.current = false;
+      setSelectedIds(clearLicenseSelection());
+      setSelectionError("");
+      window.location.reload();
+    },
+    onError: (error) => {
+      batchDeleteInFlight.current = false;
+      setSelectionError(error.message || t("batchDeleteFailed"));
+    },
   });
 
   const renewMutation = trpc.activation.renew.useMutation({
@@ -138,6 +163,32 @@ export default function AdminPage() {
     else if (filter === 'unused') result = codes.filter(c => !c.machineId);
     return result;
   }, [codes, filter]);
+
+  const visibleIds = useMemo(() => filteredCodes.map((code) => code.id), [filteredCodes]);
+  const selectedVisibleCount = selectedVisibleLicenseCount(selectedIds, visibleIds);
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisibleCount === visibleIds.length;
+
+  const toggleSelected = (id: number, checked: boolean) => {
+    setSelectionError("");
+    setSelectedIds((current) => toggleLicenseSelection(current, id, checked));
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectionError("");
+    if (checked && !canSelectVisibleLicenses(selectedIds, visibleIds)) {
+      setSelectionError(t("batchDeleteLimit"));
+      return;
+    }
+    setSelectedIds((current) => toggleVisibleLicenseSelection(current, visibleIds, checked));
+  };
+
+  const confirmBatchDelete = () => {
+    if (selectedIds.length === 0 || batchDeleteInFlight.current) return;
+    if (window.confirm(t("batchDeleteConfirm", { count: selectedIds.length }))) {
+      batchDeleteInFlight.current = true;
+      batchDeleteMutation.mutate({ ids: selectedIds });
+    }
+  };
 
   if (authLoading) return <div className="flex items-center justify-center h-screen"><Loader2 className="animate-spin text-primary" /></div>;
   
@@ -260,21 +311,21 @@ export default function AdminPage() {
               <div className="flex items-center gap-4">
                 <Tabs value={filter} onValueChange={setFilter}>
                   <TabsList className="bg-slate-100/50 p-1 rounded-xl border border-white/20">
-                    <TabsTrigger value="all" className="rounded-lg px-4 text-[10px] font-bold">{t("all")}</TabsTrigger>
-                    <TabsTrigger value="active" className="rounded-lg px-4 text-[10px] font-bold">{t("active")}</TabsTrigger>
-                    <TabsTrigger value="expired" className="rounded-lg px-4 text-[10px] font-bold text-rose-400">{t("expired")}</TabsTrigger>
+                    <TabsTrigger value="all" onClick={() => setSelectedIds(clearLicenseSelection())} className="rounded-lg px-4 text-[10px] font-bold">{t("all")}</TabsTrigger>
+                    <TabsTrigger value="active" onClick={() => setSelectedIds(clearLicenseSelection())} className="rounded-lg px-4 text-[10px] font-bold">{t("active")}</TabsTrigger>
+                    <TabsTrigger value="expired" onClick={() => setSelectedIds(clearLicenseSelection())} className="rounded-lg px-4 text-[10px] font-bold text-rose-400">{t("expired")}</TabsTrigger>
                   </TabsList>
                 </Tabs>
                 <div className="relative group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-300" />
                   <Input 
                     placeholder={t("search")} 
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    value={searchInput}
+                    onChange={(e) => { setSearchInput(e.target.value); setSelectedIds(clearLicenseSelection()); }}
                     className="pl-11 h-10 bg-white/60 border-none rounded-xl focus-visible:ring-primary/10 shadow-inner text-xs w-48"
                   />
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => refetch()} className="rounded-xl h-10 w-10 hover:bg-white/60">
+                <Button variant="ghost" size="icon" onClick={() => { setSelectedIds(clearLicenseSelection()); refetch(); }} className="rounded-xl h-10 w-10 hover:bg-white/60">
                   <RefreshCw className={`h-4 w-4 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
@@ -283,10 +334,31 @@ export default function AdminPage() {
 
           <TabsContent value="licenses" className="mt-0">
             <div className="glass-card rounded-[2.5rem] overflow-hidden border border-white/60 shadow-2xl shadow-slate-200/40 bg-white/40 backdrop-blur-2xl">
-              <Table>
-                <TableHeader className="bg-slate-50/20">
+              <div className="flex min-h-14 items-center justify-between gap-4 border-b border-white/30 px-8 py-3">
+                <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
+                  <span className={selectedIds.length > 0 ? "" : "invisible"}>{t("selectedCount", { count: selectedIds.length })}</span>
+                  <button type="button" onClick={() => setSelectedIds(clearLicenseSelection())} className={selectedIds.length > 0 ? "text-slate-400 underline-offset-4 hover:underline" : "invisible"}>{t("clearSelection")}</button>
+                </div>
+                <Button type="button" onClick={confirmBatchDelete} disabled={selectedIds.length === 0} className="h-9 rounded-xl bg-rose-500 px-4 text-xs text-white shadow-sm hover:bg-rose-600 disabled:pointer-events-none disabled:opacity-40">
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  {t("batchDelete")}
+                </Button>
+              </div>
+              <p role="alert" aria-live="polite" className={selectionError ? "mx-8 mt-3 rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-600" : "mx-8 mt-3 h-0 overflow-hidden text-[11px]"}>
+                {selectionError || "\u00a0"}
+              </p>
+              <div className="max-h-[640px] overflow-auto">
+                <Table>
+                <TableHeader className="sticky top-0 z-10 bg-slate-50/90 backdrop-blur">
                   <TableRow className="hover:bg-transparent border-none">
-                    <TableHead className="py-6 pl-10 font-bold text-slate-400 uppercase tracking-[0.2em] text-[9px]">{t("licenseKey")}</TableHead>
+                    <TableHead className="w-14 pl-8 py-6">
+                      <Checkbox
+                        checked={allVisibleSelected ? true : selectedVisibleCount > 0 ? "indeterminate" : false}
+                        onCheckedChange={(checked) => toggleSelectAll(checked === true)}
+                        aria-label={t("selectAll")}
+                      />
+                    </TableHead>
+                    <TableHead className="py-6 pl-4 font-bold text-slate-400 uppercase tracking-[0.2em] text-[9px]">{t("licenseKey")}</TableHead>
                     <TableHead className="font-bold text-slate-400 uppercase tracking-[0.2em] text-[9px]">{t("status")}</TableHead>
                     <TableHead className="font-bold text-slate-400 uppercase tracking-[0.2em] text-[9px]">{t("hwid")}</TableHead>
                     <TableHead className="font-bold text-slate-400 uppercase tracking-[0.2em] text-[9px]">{t("duration")}</TableHead>
@@ -297,15 +369,22 @@ export default function AdminPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={7} className="h-80 text-center"><Loader2 className="animate-spin mx-auto opacity-10" size={64} /></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="h-80 text-center"><Loader2 className="animate-spin mx-auto opacity-10" size={64} /></TableCell></TableRow>
                   ) : filteredCodes.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="h-80 text-center text-slate-300 font-serif italic text-lg">{t("noRecords")}</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="h-80 text-center text-slate-300 font-serif italic text-lg">{t("noRecords")}</TableCell></TableRow>
                   ) : (
                     filteredCodes.map((ac) => {
                       const isExpired = ac.expiresAt && new Date(ac.expiresAt).getTime() <= Date.now();
                       return (
                         <TableRow key={ac.id} className="group hover:bg-white/60 transition-colors border-white/20">
-                          <TableCell className="pl-10 py-6">
+                          <TableCell className="w-14 pl-8 py-6">
+                            <Checkbox
+                              checked={selectedIds.includes(ac.id)}
+                              onCheckedChange={(checked) => toggleSelected(ac.id, checked === true)}
+                              aria-label={t("selectLicense", { code: ac.code })}
+                            />
+                          </TableCell>
+                          <TableCell className="pl-4 py-6">
                             <div className="flex items-center gap-3">
                               <code className="bg-white/80 text-slate-600 px-3 py-1.5 rounded-xl text-xs font-mono tracking-tight shadow-sm border border-white/60">{ac.code}</code>
                               <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(ac.code); toast.success(t("copied")); }} className="opacity-0 group-hover:opacity-100 h-8 w-8 rounded-xl transition-all hover:bg-white shadow-sm">
@@ -389,7 +468,8 @@ export default function AdminPage() {
                     })
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </div>
           </TabsContent>
 

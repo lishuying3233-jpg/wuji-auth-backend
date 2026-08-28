@@ -1,4 +1,4 @@
-import { eq, desc, and, like, or } from "drizzle-orm";
+import { eq, desc, and, like, or, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -161,6 +161,14 @@ export async function deleteActivationCode(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(activationCodes).where(eq(activationCodes.id, id));
+}
+
+export async function deleteActivationCodes(ids: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const uniqueIds = Array.from(new Set(ids.filter((id) => Number.isInteger(id) && id > 0)));
+  if (uniqueIds.length === 0) return;
+  await db.delete(activationCodes).where(inArray(activationCodes.id, uniqueIds));
 }
 
 export async function renewActivationCode(id: number, days: number) {
