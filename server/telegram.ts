@@ -6,10 +6,25 @@ function escapeHtml(value: unknown) {
     .replace(/\"/g, "&quot;");
 }
 
-export async function sendTelegramMessage(text: string) {
-  const token = process.env.TG_BOT_TOKEN;
-  const chatId = process.env.TG_CHAT_ID;
+export async function sendTelegramMessage(text: string, force?: boolean) {
+  let token = process.env.TG_BOT_TOKEN;
+  let chatId = process.env.TG_CHAT_ID;
+  let isEnabled = true;
 
+  try {
+    // 动态加载 db 避免循环依赖
+    const { getTelegramSettings } = await import("./db");
+    const settings = await getTelegramSettings();
+    if (settings) {
+      if (settings.botToken) token = settings.botToken;
+      if (settings.chatId) chatId = settings.chatId;
+      isEnabled = settings.isEnabled === 1;
+    }
+  } catch (err) {
+    // 忽略加载错误，使用环境变量作为回退
+  }
+
+  if (!force && !isEnabled) return;
   if (!token || !chatId) {
     console.warn("[Telegram] Notification skipped: Bot Token or Chat ID not configured.");
     return;
@@ -19,6 +34,7 @@ export async function sendTelegramMessage(text: string) {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         chat_id: chatId,
         text,

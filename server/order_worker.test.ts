@@ -5,6 +5,13 @@ import * as blockchain from "./blockchain";
 
 vi.mock("./db");
 vi.mock("./blockchain");
+vi.mock("./telegram", () => ({
+  sendTelegramMessage: vi.fn().mockResolvedValue(undefined),
+  TG_TEMPLATES: {
+    orderVerified: () => "verified",
+    orderFailed: () => "failed"
+  }
+}));
 
 describe("OrderWorker", () => {
   beforeEach(() => {

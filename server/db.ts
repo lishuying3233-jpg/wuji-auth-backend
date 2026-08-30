@@ -1,6 +1,6 @@
 import { eq, desc, and, like, or, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin, paymentSettings, orders } from "../drizzle/schema";
+import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin, paymentSettings, orders, telegramSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -218,9 +218,8 @@ export async function verifyActivationCode(code: string, machineId: string) {
       
       // 发送 TG 通知；测试环境不触发外部副作用
       if (process.env.NODE_ENV !== "test") {
-        void import("./telegram").then(({ sendTelegramMessage, TG_TEMPLATES }) => {
-          void sendTelegramMessage(TG_TEMPLATES.licenseActivated(ac, machineId));
-        });
+        const { sendTelegramMessage, TG_TEMPLATES } = await import("./telegram");
+        await sendTelegramMessage(TG_TEMPLATES.licenseActivated(ac, machineId));
       }
       
       return { success: true, message: "激活成功", expiresAt: expiresAt.getTime() };
@@ -302,4 +301,33 @@ export async function getActivationCodeByMachineId(machineId: string) {
   if (!db) return undefined;
   const result = await db.select().from(activationCodes).where(eq(activationCodes.machineId, machineId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getTelegramSettings() {
+  const db = await getDb();
+  if (!db) return null;
+  const results = await db.select().from(telegramSettings).limit(1);
+  return results[0] || null;
+}
+
+export async function updateTelegramSettings(data: {
+  botToken?: string;
+  chatId?: string;
+  isEnabled?: number;
+}) {
+  const db = await getDb();
+  if (!db) return null;
+  const existing = await getTelegramSettings();
+  if (existing) {
+    return db
+      .update(telegramSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(telegramSettings.id, existing.id));
+  } else {
+    return db.insert(telegramSettings).values({
+      botToken: data.botToken || "",
+      chatId: data.chatId || "",
+      isEnabled: data.isEnabled ?? 0,
+    });
+  }
 }

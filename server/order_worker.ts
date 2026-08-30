@@ -47,7 +47,7 @@ export async function processPendingOrders() {
         });
 
         await db.updateOrderStatus(order.id, "completed", finalCode);
-        void sendTelegramMessage(TG_TEMPLATES.orderVerified(order, finalCode));
+        await sendTelegramMessage(TG_TEMPLATES.orderVerified(order, finalCode));
         console.log(`[OrderWorker] Order #${order.id} verified and completed. Code: ${finalCode}`);
       } else if (result.confirmed === false) {
         // 尚未确认（确认数不足），保持 pending
@@ -56,7 +56,7 @@ export async function processPendingOrders() {
       } else {
         // 明确失败（如金额不匹配、地址不匹配、交易失败）
         await db.updateOrderStatus(order.id, "failed", undefined, result.message);
-        void sendTelegramMessage(TG_TEMPLATES.orderFailed(order, result.message));
+        await sendTelegramMessage(TG_TEMPLATES.orderFailed(order, result.message));
         console.log(`[OrderWorker] Order #${order.id} verification failed: ${result.message}`);
       }
     } catch (e: any) {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,9 +43,21 @@ export default function AdminPage() {
   const { data: admins } = trpc.admin.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
   const { data: addresses } = trpc.order.listSettings.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
   const { data: orders } = trpc.order.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
+  const { data: tgSettings } = trpc.order.getTelegramSettings.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
 
   const [newAddress, setNewAddress] = useState("");
   const [newNetwork, setNewNetwork] = useState<"ERC20" | "TRC20">("TRC20");
+  const [tgBotToken, setTgBotToken] = useState("");
+  const [tgChatId, setTgChatId] = useState("");
+  const [tgEnabled, setTgEnabled] = useState(0);
+
+  useEffect(() => {
+    if (tgSettings) {
+      setTgBotToken(tgSettings.botToken || "");
+      setTgChatId(tgSettings.chatId || "");
+      setTgEnabled(tgSettings.isEnabled);
+    }
+  }, [tgSettings]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(searchInput.trim()), 300);
@@ -169,6 +181,19 @@ export default function AdminPage() {
       utils.order.list.invalidate();
       utils.activation.list.invalidate();
     }
+  });
+
+  const updateTgSettingsMutation = trpc.order.updateTelegramSettings.useMutation({
+    onSuccess: () => {
+      toast.success(t("tgSaveSuccess"));
+      utils.order.getTelegramSettings.invalidate();
+    },
+    onError: () => toast.error(t("tgSaveFailed"))
+  });
+
+  const testTgMutation = trpc.order.testTelegram.useMutation({
+    onSuccess: () => toast.success(t("tgTestSuccess")),
+    onError: () => toast.error(t("tgTestFailed"))
   });
 
   const stats = useMemo(() => {
@@ -336,10 +361,11 @@ export default function AdminPage() {
                 <>
                   <TabsTrigger value="orders" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("orderManagement")}</TabsTrigger>
                   <TabsTrigger value="payments" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("paymentManagement")}</TabsTrigger>
-                  <TabsTrigger value="admins" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("administrators")}</TabsTrigger>
-                </>
-              )}
-            </TabsList>
+	                  <TabsTrigger value="admins" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("administrators")}</TabsTrigger>
+	                  <TabsTrigger value="notifications" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("notificationSettings")}</TabsTrigger>
+	                </>
+	              )}
+	            </TabsList>
             
             {activeTab === "licenses" && (
               <div className="flex items-center gap-4">
@@ -702,6 +728,74 @@ export default function AdminPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              </div>
+            </TabsContent>
+          )}
+
+          {isSuper && (
+            <TabsContent value="notifications" className="space-y-6 focus-visible:ring-0">
+              <div className="glass-card p-8 rounded-3xl border border-white/60 bg-white/40 backdrop-blur-xl shadow-sm max-w-2xl">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-bold text-slate-800">{t("notificationSettings")}</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">{t("tgSettingsHint")}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t("tgBotToken")}</label>
+                      <Input 
+                        type="password"
+                        placeholder="8775411481:AAEeEpi..."
+                        value={tgBotToken}
+                        onChange={(e) => setTgBotToken(e.target.value)}
+                        className="rounded-2xl border-white/60 bg-white/50 h-12 focus:ring-slate-200"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">{t("tgChatId")}</label>
+                      <Input 
+                        placeholder="8201023469"
+                        value={tgChatId}
+                        onChange={(e) => setTgChatId(e.target.value)}
+                        className="rounded-2xl border-white/60 bg-white/50 h-12 focus:ring-slate-200"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-white/40 rounded-2xl border border-white/60">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-bold text-slate-700">{t("tgEnabled")}</p>
+                        <p className="text-[10px] text-slate-400">接收实时订单与授权动态通知</p>
+                      </div>
+                      <Checkbox 
+                        checked={tgEnabled === 1}
+                        onCheckedChange={(checked) => setTgEnabled(checked ? 1 : 0)}
+                        className="rounded-lg w-6 h-6 border-slate-300 data-[state=checked]:bg-slate-800 data-[state=checked]:border-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <Button 
+                      onClick={() => updateTgSettingsMutation.mutate({ botToken: tgBotToken, chatId: tgChatId, isEnabled: tgEnabled })}
+                      disabled={updateTgSettingsMutation.isPending}
+                      className="flex-1 rounded-2xl h-12 bg-slate-800 hover:bg-slate-900 text-white font-bold shadow-lg"
+                    >
+                      {updateTgSettingsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      {t("finis")}
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => testTgMutation.mutate()}
+                      disabled={testTgMutation.isPending || !tgBotToken || !tgChatId}
+                      className="rounded-2xl h-12 border-white/60 bg-white/50 font-bold hover:bg-white/80"
+                    >
+                      {testTgMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                      {t("tgTest")}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </TabsContent>

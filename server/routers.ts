@@ -105,7 +105,7 @@ export const appRouter = router({
         if (input.status === 'disabled') {
           const codes = await db.getActivationCodes();
           const code = codes.find(c => c.id === input.id);
-          if (code) void sendTelegramMessage(TG_TEMPLATES.licenseDisabled(code.code, (ctx.user as any)?.username || "Admin"));
+          if (code) await sendTelegramMessage(TG_TEMPLATES.licenseDisabled(code.code, (ctx.user as any)?.username || "Admin"));
         }
         return { success: true };
       }),
@@ -130,7 +130,7 @@ export const appRouter = router({
         await db.renewActivationCode(input.id, input.days);
         const codes = await db.getActivationCodes();
         const code = codes.find(c => c.id === input.id);
-        if (code) void sendTelegramMessage(TG_TEMPLATES.licenseRenewed(code.code, input.days, (ctx.user as any)?.username || "Admin"));
+        if (code) await sendTelegramMessage(TG_TEMPLATES.licenseRenewed(code.code, input.days, (ctx.user as any)?.username || "Admin"));
         return { success: true };
       }),
   }),
@@ -196,7 +196,7 @@ export const appRouter = router({
         }
         const order = await db.createOrder(input);
         // 发送 TG 通知
-        void sendTelegramMessage(TG_TEMPLATES.orderCreated({ ...input, id: (order as any).insertId }));
+        await sendTelegramMessage(TG_TEMPLATES.orderCreated({ ...input, id: (order as any).insertId }));
         return order;
       }),
     getSubscription: publicProcedure
@@ -271,7 +271,29 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await db.deletePaymentSetting(input.id);
         return { success: true };
-      })
+      }),
+    getTelegramSettings: protectedProcedure.query(async ({ ctx }) => {
+      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可管理通知" });
+      return await db.getTelegramSettings();
+    }),
+    updateTelegramSettings: protectedProcedure
+      .input(
+        z.object({
+          botToken: z.string().optional(),
+          chatId: z.string().optional(),
+          isEnabled: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可修改通知" });
+        return await db.updateTelegramSettings(input);
+      }),
+    testTelegram: protectedProcedure.mutation(async ({ ctx }) => {
+      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可发送测试" });
+      const { sendTelegramMessage } = await import("./telegram");
+      await sendTelegramMessage("<b>🔔 测试通知</b>\n━━━━━━━━━━━━━━\n这是一条来自 M7社媒助手后台的测试消息，您的 Telegram 通知已配置成功。", true);
+      return { success: true };
+    }),
   })
 });
 

@@ -50,6 +50,13 @@
       "when": 1787925246566,
       "tag": "0006_sweet_vargas",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1788091859945,
+      "tag": "0007_plain_typhoid_mary",
+      "breakpoints": true
     }
   ]
 }

@@ -77,3 +77,11 @@ export const orders = mysqlTable("orders", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+export const telegramSettings = mysqlTable("telegram_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  botToken: text("botToken"),
+  chatId: varchar("chatId", { length: 64 }),
+  isEnabled: int("isEnabled").default(0).notNull(), // 0: disabled, 1: enabled
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
