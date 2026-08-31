@@ -50,6 +50,7 @@ export default function AdminPage() {
   const [tgBotToken, setTgBotToken] = useState("");
   const [tgChatId, setTgChatId] = useState("");
   const [tgEnabled, setTgEnabled] = useState(0);
+  const [tgTestResult, setTgTestResult] = useState<{ success?: boolean, error?: string } | null>(null);
 
   useEffect(() => {
     if (tgSettings) {
@@ -144,6 +145,14 @@ export default function AdminPage() {
     }
   });
 
+  const correctDurationMutation = trpc.activation.correctDuration.useMutation({
+    onSuccess: (result) => {
+      toast.success(`期限已修正为 ${result.planName}（${result.durationDays} 天）`);
+      utils.activation.list.invalidate();
+    },
+    onError: (error) => toast.error(error.message || "期限修正失败"),
+  });
+
   const createAdminMutation = trpc.admin.create.useMutation({
     onSuccess: () => {
       toast.success(t("adminCreated"));
@@ -192,8 +201,15 @@ export default function AdminPage() {
   });
 
   const testTgMutation = trpc.order.testTelegram.useMutation({
-    onSuccess: () => toast.success(t("tgTestSuccess")),
-    onError: (err) => toast.error(err.message || t("tgTestFailed")),
+    onMutate: () => setTgTestResult(null),
+    onSuccess: () => {
+      setTgTestResult({ success: true });
+      toast.success(t("tgTestSuccess"));
+    },
+    onError: (err) => {
+      setTgTestResult({ success: false, error: err.message || t("tgTestFailed") });
+      toast.error(err.message || t("tgTestFailed"));
+    },
   });
 
   const stats = useMemo(() => {
@@ -241,6 +257,20 @@ export default function AdminPage() {
       batchDeleteInFlight.current = true;
       batchDeleteMutation.mutate({ ids: selectedIds });
     }
+  };
+
+  const correctDuration = (id: number, currentDuration: number) => {
+    const input = window.prompt(
+      "修正授权期限（仅限 1、3、7、30、90 或 365 天）。已激活的卡将按首次激活时间同步重算到期日。",
+      String(currentDuration),
+    );
+    if (input === null) return;
+    const durationDays = Number(input.trim());
+    if (!supportedDurations.has(String(durationDays))) {
+      toast.error("请输入 1、3、7、30、90 或 365。");
+      return;
+    }
+    correctDurationMutation.mutate({ id, durationDays });
   };
 
   if (authLoading) return <div className="flex items-center justify-center h-screen"><Loader2 className="animate-spin text-primary" /></div>;
@@ -505,6 +535,16 @@ export default function AdminPage() {
                                   </div>
                                 </DialogContent>
                               </Dialog>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                title="修正授权期限"
+                                disabled={correctDurationMutation.isPending}
+                                onClick={() => correctDuration(ac.id, ac.durationDays)}
+                                className="h-9 w-9 rounded-2xl text-slate-300 hover:bg-blue-50 hover:text-blue-500"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -788,14 +828,29 @@ export default function AdminPage() {
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={() => testTgMutation.mutate({ botToken: tgBotToken, chatId: tgChatId })}
-                      disabled={testTgMutation.isPending || !tgBotToken || !tgChatId}
+                      onClick={() => {
+                        if (!tgBotToken || !tgChatId) {
+                          toast.error("请先输入 Token 和 Chat ID");
+                          return;
+                        }
+                        testTgMutation.mutate({ botToken: tgBotToken, chatId: tgChatId });
+                      }}
+                      disabled={testTgMutation.isPending}
                       className="rounded-2xl h-12 border-white/60 bg-white/50 font-bold hover:bg-white/80"
                     >
                       {testTgMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                       {t("tgTest")}
                     </Button>
                   </div>
+                  {tgTestResult && (
+                    <div className={`mt-3 p-3 rounded-xl text-xs font-medium border ${tgTestResult.success ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                      {tgTestResult.success ? (
+                        <div className="flex items-center gap-2"><ShieldCheck className="w-3 h-3" /> {t("tgTestSuccess")}</div>
+                      ) : (
+                        <div className="flex items-start gap-2"><ShieldAlert className="w-3 h-3 mt-0.5" /> {tgTestResult.error}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </TabsContent>

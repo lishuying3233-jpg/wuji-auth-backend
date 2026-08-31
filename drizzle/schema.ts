@@ -30,7 +30,7 @@ export const activationCodes = mysqlTable("activation_codes", {
   code: varchar("code", { length: 64 }).notNull().unique(),
   status: mysqlEnum("status", ["active", "disabled"]).default("active").notNull(),
   machineId: varchar("machineId", { length: 64 }),
-  durationDays: int("durationDays").default(365).notNull(), // 默认一年
+  durationDays: int("durationDays").notNull(), // 必须由发码流程显式指定，禁止静默默认成一年
   expiresAt: timestamp("expiresAt"),
   activatedAt: timestamp("activatedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

@@ -188,6 +188,26 @@ export async function renewActivationCode(id: number, days: number) {
   }).where(eq(activationCodes.id, id));
 }
 
+/**
+ * 用于纠正历史上以默认 365 天写入的授权码。若已激活，则以首次激活时间
+ * 为基准重算到期日，避免只改展示、实际授权仍为年卡。
+ */
+export async function correctActivationCodeDuration(id: number, durationDays: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(activationCodes).where(eq(activationCodes.id, id)).limit(1);
+  if (result.length === 0) return undefined;
+
+  const code = result[0];
+  const expiresAt = code.activatedAt
+    ? new Date(code.activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000)
+    : null;
+
+  await db.update(activationCodes).set({ durationDays, expiresAt }).where(eq(activationCodes.id, id));
+  return { ...code, durationDays, expiresAt };
+}
+
 export async function verifyActivationCode(code: string, machineId: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

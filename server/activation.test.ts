@@ -15,7 +15,7 @@ describe("activation.verify", () => {
 
   it("should bind and succeed on first use", async () => {
     // Manually create a code in DB for testing
-    await db.createActivationCode({ code: testCode, note: "Test" });
+    await db.createActivationCode({ code: testCode, note: "Test", durationDays: 3, status: "active" });
     
     const caller = appRouter.createCaller({ user: null } as any);
     const result = await caller.auth.verify({ code: testCode, machineId: testMachineId });

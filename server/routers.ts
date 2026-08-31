@@ -9,7 +9,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { ONE_YEAR_MS } from "@shared/const";
 import { sendTelegramMessage, TG_TEMPLATES } from "./telegram";
-import { PLANS } from "../shared/payment_const";
+import { PLANS, getPlanNameByDuration, isSupportedPlanDuration } from "../shared/payment_const";
 import { orders as ordersTable } from "../drizzle/schema";
 
 export const appRouter = router({
@@ -72,8 +72,10 @@ export const appRouter = router({
           })
           .optional(),
         note: z.string().optional(), 
-        durationDays: z.number(),
-        count: z.number().default(1) 
+        durationDays: z.number().int().refine(isSupportedPlanDuration, {
+          message: "不支持的授权期限",
+        }),
+        count: z.number().int().min(1).max(50).default(1)
       }))
       .mutation(async ({ input }) => {
         const results = [];
@@ -125,13 +127,32 @@ export const appRouter = router({
       }),
 
     renew: protectedProcedure
-      .input(z.object({ id: z.number(), days: z.number() }))
+      .input(z.object({ id: z.number().int().positive(), days: z.number().int().positive() }))
       .mutation(async ({ input, ctx }) => {
         await db.renewActivationCode(input.id, input.days);
         const codes = await db.getActivationCodes();
         const code = codes.find(c => c.id === input.id);
         if (code) await sendTelegramMessage(TG_TEMPLATES.licenseRenewed(code.code, input.days, (ctx.user as any)?.username || "Admin"));
         return { success: true };
+      }),
+
+    // 用于纠正历史上被默认写成 365 天的激活码；已激活时会同步修正到期日。
+    correctDuration: protectedProcedure
+      .input(z.object({
+        id: z.number().int().positive(),
+        durationDays: z.number().int().refine(isSupportedPlanDuration, {
+          message: "不支持的授权期限",
+        }),
+      }))
+      .mutation(async ({ input }) => {
+        const updated = await db.correctActivationCodeDuration(input.id, input.durationDays);
+        if (!updated) throw new TRPCError({ code: "NOT_FOUND", message: "激活码不存在" });
+        return {
+          success: true,
+          durationDays: updated.durationDays,
+          expiresAt: updated.expiresAt?.getTime() ?? null,
+          planName: getPlanNameByDuration(updated.durationDays),
+        };
       }),
   }),
 
@@ -205,10 +226,10 @@ export const appRouter = router({
         const code = await db.getActivationCodeByMachineId(input.machineId);
         if (!code) return { active: false };
         return {
-          active: code.status === 'active',
-          expiresAt: code.expiresAt?.getTime(),
+          active: code.status === 'active' && (!code.expiresAt || code.expiresAt.getTime() > Date.now()),
+          expiresAt: code.expiresAt?.getTime() ?? null,
           durationDays: code.durationDays,
-          planName: code.durationDays >= 365 ? '年卡' : code.durationDays >= 30 ? '月卡' : '体验卡'
+          planName: getPlanNameByDuration(code.durationDays)
         };
       }),
     getOrderStatus: publicProcedure
