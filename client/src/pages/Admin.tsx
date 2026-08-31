@@ -193,7 +193,7 @@ export default function AdminPage() {
 
   const testTgMutation = trpc.order.testTelegram.useMutation({
     onSuccess: () => toast.success(t("tgTestSuccess")),
-    onError: () => toast.error(t("tgTestFailed"))
+    onError: (err) => toast.error(err.message || t("tgTestFailed")),
   });
 
   const stats = useMemo(() => {
@@ -788,7 +788,7 @@ export default function AdminPage() {
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={() => testTgMutation.mutate()}
+                      onClick={() => testTgMutation.mutate({ botToken: tgBotToken, chatId: tgChatId })}
                       disabled={testTgMutation.isPending || !tgBotToken || !tgChatId}
                       className="rounded-2xl h-12 border-white/60 bg-white/50 font-bold hover:bg-white/80"
                     >

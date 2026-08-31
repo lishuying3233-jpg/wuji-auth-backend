@@ -274,7 +274,15 @@ export const appRouter = router({
       }),
     getTelegramSettings: protectedProcedure.query(async ({ ctx }) => {
       if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可管理通知" });
-      return await db.getTelegramSettings();
+      const settings = await db.getTelegramSettings();
+      if (settings && settings.botToken) {
+        // Token 脱敏：保留前 6 位和后 4 位
+        const t = settings.botToken;
+        if (t.length > 10) {
+          settings.botToken = `${t.slice(0, 6)}******${t.slice(-4)}`;
+        }
+      }
+      return settings;
     }),
     updateTelegramSettings: protectedProcedure
       .input(
@@ -286,14 +294,45 @@ export const appRouter = router({
       )
       .mutation(async ({ input, ctx }) => {
         if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可修改通知" });
-        return await db.updateTelegramSettings(input);
+        
+        // 如果输入是脱敏后的 Token，则不更新 Token 字段
+        const updateData = { ...input };
+        if (updateData.botToken && updateData.botToken.includes("******")) {
+          delete updateData.botToken;
+        }
+        
+        return await db.updateTelegramSettings(updateData);
       }),
-    testTelegram: protectedProcedure.mutation(async ({ ctx }) => {
-      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可发送测试" });
-      const { sendTelegramMessage } = await import("./telegram");
-      await sendTelegramMessage("<b>🔔 测试通知</b>\n━━━━━━━━━━━━━━\n这是一条来自 M7社媒助手后台的测试消息，您的 Telegram 通知已配置成功。", true);
-      return { success: true };
-    }),
+    testTelegram: protectedProcedure
+      .input(z.object({
+        botToken: z.string().optional(),
+        chatId: z.string().optional(),
+      }).optional())
+      .mutation(async ({ input, ctx }) => {
+        if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可发送测试" });
+        const { sendTelegramMessage } = await import("./telegram");
+        
+        // 如果输入是脱敏后的 Token，则从数据库读取真实 Token
+        let effectiveToken = input?.botToken;
+        if (effectiveToken && effectiveToken.includes("******")) {
+          const settings = await db.getTelegramSettings();
+          effectiveToken = settings?.botToken || undefined;
+        }
+
+        const result = await sendTelegramMessage(
+          "<b>🔔 测试通知</b>\n━━━━━━━━━━━━━━\n这是一条来自 M7社媒助手后台的测试消息，您的 Telegram 通知已配置成功。", 
+          true,
+          { botToken: effectiveToken, chatId: input?.chatId }
+        );
+
+        if (!result.success) {
+          throw new TRPCError({ 
+            code: "BAD_REQUEST", 
+            message: `发送失败: ${result.error}` 
+          });
+        }
+        return { success: true };
+      }),
   })
 });
 
