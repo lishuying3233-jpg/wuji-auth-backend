@@ -223,14 +223,15 @@ export const appRouter = router({
     getSubscription: publicProcedure
       .input(z.object({
         machineId: z.string(),
-        activationCode: z.string().trim().min(1).optional(),
+        activationCode: z.string().trim().min(1),
       }))
       .query(async ({ input }) => {
-        // 新版客户端提交本地保存的激活码，避免同一机器或机器码碰撞时串用其他授权。
-        // 旧版客户端未提交 activationCode 时，继续兼容按机器码查询。
-        const code = input.activationCode
-          ? await db.getActivationCodeByCodeForMachine(input.activationCode.toUpperCase(), input.machineId)
-          : await db.getActivationCodeByMachineId(input.machineId);
+        // 订阅必须按“激活码 + 机器码”精确定位；禁止按机器码回退，
+        // 避免旧授权或其他激活码的套餐被错误显示到当前用户。
+        const code = await db.getActivationCodeByCodeForMachine(
+          input.activationCode.toUpperCase(),
+          input.machineId,
+        );
         if (!code) return { active: false };
         return {
           active: code.status === 'active' && (!code.expiresAt || code.expiresAt.getTime() > Date.now()),
