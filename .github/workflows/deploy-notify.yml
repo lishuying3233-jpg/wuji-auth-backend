@@ -1,0 +1,86 @@
+name: Build and notify deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PUBLIC_URL: https://wuji-auth-9gxch8hu.manus.space
+
+jobs:
+  build-and-notify:
+    name: Build, check online, and notify Telegram
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run check
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Wait for public deployment
+        id: online-check
+        shell: bash
+        run: |
+          set -euo pipefail
+          last_status="000"
+          for attempt in $(seq 1 30); do
+            last_status="$(curl -L -sS -o /tmp/wuji-public-response.html -w '%{http_code}' --max-time 20 "${PUBLIC_URL}/login" || true)"
+            if [ "$last_status" = "200" ]; then
+              echo "public_url_ready=true" >> "$GITHUB_OUTPUT"
+              echo "Public URL is reachable after ${attempt} attempt(s)."
+              exit 0
+            fi
+            echo "Attempt ${attempt}/30: ${PUBLIC_URL}/login returned HTTP ${last_status}; waiting 20 seconds."
+            sleep 20
+          done
+          echo "public_url_ready=false" >> "$GITHUB_OUTPUT"
+          echo "Public URL did not become reachable. Last HTTP status: ${last_status}"
+          exit 1
+
+      - name: Notify Telegram
+        if: success() && steps.online-check.outputs.public_url_ready == 'true'
+        shell: bash
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TG_BOT_TOKEN:-}" ] || [ -z "${TG_CHAT_ID:-}" ]; then
+            echo "Missing TG_BOT_TOKEN or TG_CHAT_ID repository secret."
+            exit 1
+          fi
+
+          deploy_time="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          short_sha="${GITHUB_SHA:0:7}"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          message="部署检查成功%0A时间：${deploy_time}%0A提交：${short_sha}%0A线上地址：${PUBLIC_URL}%0A工作流：${run_url}"
+
+          curl --fail --silent --show-error \
+            --request POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT_ID}" \
+            --data-urlencode "text=${message}"
