@@ -48,7 +48,10 @@ describe("Telegram Notifications", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await sendTelegramMessage("Test Message");
+    await sendTelegramMessage("Test Message", true, {
+      botToken: "MOCK_TOKEN",
+      chatId: "MOCK_CHAT_ID",
+    });
 
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining("botMOCK_TOKEN/sendMessage"),

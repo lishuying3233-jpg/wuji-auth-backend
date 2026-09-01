@@ -143,3 +143,14 @@
 - [x] 为清空选择新增可执行测试，覆盖 selectedIds 归零
 - [x] 通过代码路径检查确认筛选、搜索和刷新均调用 clearLicenseSelection
 - [ ] 保存包含清空选择验证的多选/全选版本（需在验证后单独保存检查点）
+
+## GitHub 同步发布
+- [x] 从 `lishuying3233-jpg/wuji-auth-backend` 的 `main` 分支同步最新代码
+- [x] 创建发布检查点并部署同步后的后台版本（检查点 `c2465020`）
+
+## GitHub 同步后验证修复
+- [x] 将 Telegram 凭据和 Chat ID 测试默认改为离线格式校验
+- [x] 保留显式 `RUN_TELEGRAM_LIVE_TESTS=1` 才执行的真实接口测试
+- [x] 修正 Telegram 通知单元测试使用显式测试配置，避免数据库配置干扰
+- [x] 完成全量 Vitest 验证（43 passed，2 skipped）
+- [x] 完成生产构建验证
