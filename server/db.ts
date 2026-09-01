@@ -320,8 +320,9 @@ export async function getActivationCodeByMachineId(machineId: string) {
   const db = await getDb();
   if (!db) return undefined;
 
-  // 同一设备可能因为测试、续费或更换套餐而绑定多个授权码。
-  // 不能依赖数据库默认返回顺序，否则会随机显示旧套餐；优先取仍为 active 且到期时间最晚的授权。
+  // 同一设备可能因为测试、换卡或修正期限而绑定多个授权码。
+  // 必须优先取最近激活或最近修改的有效授权，不能按最长到期时间取值，
+  // 否则旧的季卡/年卡会覆盖用户刚激活的七天卡。
   const result = await db
     .select()
     .from(activationCodes)
@@ -329,7 +330,11 @@ export async function getActivationCodeByMachineId(machineId: string) {
       eq(activationCodes.machineId, machineId),
       eq(activationCodes.status, "active"),
     ))
-    .orderBy(desc(activationCodes.expiresAt), desc(activationCodes.updatedAt))
+    .orderBy(
+      desc(activationCodes.updatedAt),
+      desc(activationCodes.activatedAt),
+      desc(activationCodes.id),
+    )
     .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
