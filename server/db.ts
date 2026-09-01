@@ -319,10 +319,7 @@ export async function deletePaymentSetting(id: number) {
 export async function getActivationCodeByMachineId(machineId: string) {
   const db = await getDb();
   if (!db) return undefined;
-
-  // 同一设备可能因为测试、换卡或修正期限而绑定多个授权码。
-  // 必须优先取最近激活或最近修改的有效授权，不能按最长到期时间取值，
-  // 否则旧的季卡/年卡会覆盖用户刚激活的七天卡。
+  // 旧版客户端只提交机器码时，保留兼容查询；优先最近修改的有效授权。
   const result = await db
     .select()
     .from(activationCodes)
@@ -335,6 +332,22 @@ export async function getActivationCodeByMachineId(machineId: string) {
       desc(activationCodes.activatedAt),
       desc(activationCodes.id),
     )
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getActivationCodeByCodeForMachine(code: string, machineId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(activationCodes)
+    .where(and(
+      eq(activationCodes.code, code),
+      eq(activationCodes.machineId, machineId),
+    ))
     .limit(1);
 
   return result.length > 0 ? result[0] : undefined;

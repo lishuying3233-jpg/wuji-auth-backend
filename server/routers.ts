@@ -221,9 +221,16 @@ export const appRouter = router({
         return order;
       }),
     getSubscription: publicProcedure
-      .input(z.object({ machineId: z.string() }))
+      .input(z.object({
+        machineId: z.string(),
+        activationCode: z.string().trim().min(1).optional(),
+      }))
       .query(async ({ input }) => {
-        const code = await db.getActivationCodeByMachineId(input.machineId);
+        // 新版客户端提交本地保存的激活码，避免同一机器或机器码碰撞时串用其他授权。
+        // 旧版客户端未提交 activationCode 时，继续兼容按机器码查询。
+        const code = input.activationCode
+          ? await db.getActivationCodeByCodeForMachine(input.activationCode.toUpperCase(), input.machineId)
+          : await db.getActivationCodeByMachineId(input.machineId);
         if (!code) return { active: false };
         return {
           active: code.status === 'active' && (!code.expiresAt || code.expiresAt.getTime() > Date.now()),
