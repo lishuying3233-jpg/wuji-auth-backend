@@ -78,12 +78,12 @@ jobs:
           short_sha="${GITHUB_SHA:0:7}"
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           message=$(cat <<EOF
-部署检查成功
-时间：${deploy_time}
-提交：${short_sha}
-线上地址：${PUBLIC_URL}
-工作流：${run_url}
-EOF
+          部署检查成功
+          时间：${deploy_time}
+          提交：${short_sha}
+          线上地址：${PUBLIC_URL}
+          工作流：${run_url}
+          EOF
           )
 
           curl --fail --silent --show-error \
