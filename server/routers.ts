@@ -226,12 +226,9 @@ export const appRouter = router({
         activationCode: z.string().trim().min(1),
       }))
       .query(async ({ input }) => {
-        // 订阅必须按“激活码 + 机器码”精确定位；禁止按机器码回退，
-        // 避免旧授权或其他激活码的套餐被错误显示到当前用户。
-        const code = await db.getActivationCodeByCodeForMachine(
-          input.activationCode.toUpperCase(),
-          input.machineId,
-        );
+        // 激活码本身是唯一键；auth.verify 已负责校验并绑定机器。
+        // 订阅展示按激活码直接读取，避免机器码格式差异影响套餐返回。
+        const code = await db.getActivationCodeByCode(input.activationCode.toUpperCase());
         if (!code) return { active: false };
         return {
           active: code.status === 'active' && (!code.expiresAt || code.expiresAt.getTime() > Date.now()),

@@ -353,6 +353,23 @@ export async function getActivationCodeByCodeForMachine(code: string, machineId:
   return result.length > 0 ? result[0] : undefined;
 }
 
+/**
+ * 激活码本身是唯一键。订阅展示按唯一激活码读取，避免机器码差异
+ * 导致已验证的授权无法取到，进而错误落入其他授权数据。
+ */
+export async function getActivationCodeByCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db
+    .select()
+    .from(activationCodes)
+    .where(eq(activationCodes.code, code))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
 export async function getTelegramSettings() {
   const db = await getDb();
   if (!db) return null;
