@@ -319,7 +319,19 @@ export async function deletePaymentSetting(id: number) {
 export async function getActivationCodeByMachineId(machineId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(activationCodes).where(eq(activationCodes.machineId, machineId)).limit(1);
+
+  // 同一设备可能因为测试、续费或更换套餐而绑定多个授权码。
+  // 不能依赖数据库默认返回顺序，否则会随机显示旧套餐；优先取仍为 active 且到期时间最晚的授权。
+  const result = await db
+    .select()
+    .from(activationCodes)
+    .where(and(
+      eq(activationCodes.machineId, machineId),
+      eq(activationCodes.status, "active"),
+    ))
+    .orderBy(desc(activationCodes.expiresAt), desc(activationCodes.updatedAt))
+    .limit(1);
+
   return result.length > 0 ? result[0] : undefined;
 }
 
