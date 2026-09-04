@@ -44,6 +44,10 @@ export default function AdminPage() {
   const { data: addresses } = trpc.order.listSettings.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
   const { data: orders } = trpc.order.list.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
   const { data: tgSettings } = trpc.order.getTelegramSettings.useQuery(undefined, { enabled: (user as any)?.role === 'super' });
+  const { data: deployInfo, isLoading: deployLoading } = trpc.deploy.getVersions.useQuery(undefined, { 
+    enabled: (user as any)?.role === 'super',
+    refetchInterval: activeTab === 'deploy' ? 30000 : false 
+  });
 
   const [newAddress, setNewAddress] = useState("");
   const [newNetwork, setNewNetwork] = useState<"ERC20" | "TRC20">("TRC20");
@@ -210,6 +214,26 @@ export default function AdminPage() {
       setTgTestResult({ success: false, error: err.message || t("tgTestFailed") });
       toast.error(err.message || t("tgTestFailed"));
     },
+  });
+
+  const runTestsMutation = trpc.deploy.runTests.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(t("testPassed"));
+      } else {
+        toast.error(t("testFailed"));
+      }
+      utils.deploy.getVersions.invalidate();
+    },
+    onError: (err) => toast.error(err.message)
+  });
+
+  const syncAndDeployMutation = trpc.deploy.syncAndDeploy.useMutation({
+    onSuccess: () => {
+      toast.success(t("syncRequestLogged"));
+      utils.deploy.getVersions.invalidate();
+    },
+    onError: (err) => toast.error(err.message)
   });
 
   const stats = useMemo(() => {
@@ -392,10 +416,11 @@ export default function AdminPage() {
                   <TabsTrigger value="orders" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("orderManagement")}</TabsTrigger>
                   <TabsTrigger value="payments" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("paymentManagement")}</TabsTrigger>
 	                  <TabsTrigger value="admins" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("administrators")}</TabsTrigger>
-	                  <TabsTrigger value="notifications" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("notificationSettings")}</TabsTrigger>
-	                </>
-	              )}
-	            </TabsList>
+                  <TabsTrigger value="notifications" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("notificationSettings")}</TabsTrigger>
+                  <TabsTrigger value="deploy" className="rounded-xl px-8 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">{t("releaseCenter")}</TabsTrigger>
+                </>
+              )}
+            </TabsList>
             
             {activeTab === "licenses" && (
               <div className="flex items-center gap-4">
@@ -855,8 +880,97 @@ export default function AdminPage() {
               </div>
             </TabsContent>
           )}
+
+          {isSuper && (
+            <TabsContent value="deploy" className="space-y-8 focus-visible:ring-0">
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="glass-card p-8 rounded-3xl border border-white/60 bg-white/40 backdrop-blur-xl shadow-sm space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-slate-800">{t("releaseCenter")}</h3>
+                    <Badge variant="outline" className="bg-slate-100 text-slate-500 border-none px-3 py-1 rounded-full text-[9px] uppercase font-black">
+                      {deployInfo?.currentVersion || "Loading..."}
+                    </Badge>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="p-4 bg-white/60 rounded-2xl border border-white/60 space-y-3">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>GitHub Latest (main)</span>
+                      </div>
+                      {deployLoading ? (
+                        <div className="flex items-center gap-2 text-slate-400"><Loader2 className="w-3 h-3 animate-spin" /> Loading commits...</div>
+                      ) : deployInfo?.latestCommit ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <code className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-mono">{deployInfo.latestCommit.sha.slice(0, 7)}</code>
+                            <span className="text-xs font-medium text-slate-700 truncate">{deployInfo.latestCommit.message}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] text-slate-400">
+                            <span>{deployInfo.latestCommit.author}</span>
+                            <span>{new Date(deployInfo.latestCommit.date).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-rose-400">Failed to fetch GitHub info</div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button 
+                        onClick={() => runTestsMutation.mutate()}
+                        disabled={runTestsMutation.isPending}
+                        className="flex-1 rounded-2xl h-12 border-white/60 bg-white/50 font-bold hover:bg-white/80 text-slate-700 border"
+                      >
+                        {runTestsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheck className="w-4 h-4 mr-2" />}
+                        {t("runTests")}
+                      </Button>
+                      <Button 
+                        onClick={() => {
+                          if (confirm(t("confirmDeploy"))) {
+                            syncAndDeployMutation.mutate();
+                          }
+                        }}
+                        disabled={syncAndDeployMutation.isPending || runTestsMutation.isPending}
+                        className="flex-1 rounded-2xl h-12 bg-slate-800 hover:bg-slate-900 text-white font-bold shadow-lg"
+                      >
+                        {syncAndDeployMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        {t("syncAndDeploy")}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card p-8 rounded-3xl border border-white/60 bg-white/40 backdrop-blur-xl shadow-sm space-y-6 overflow-hidden flex flex-col">
+                  <h3 className="text-lg font-bold text-slate-800">{t("deployLogs")}</h3>
+                  <div className="flex-1 overflow-auto max-h-[400px] space-y-3 pr-2">
+                    {deployInfo?.logs?.map((log: any) => (
+                      <div key={log.id} className="p-3 bg-white/40 rounded-xl border border-white/60 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className={`text-[8px] uppercase font-black px-2 py-0 ${
+                            log.action === 'deploy' ? 'bg-blue-50 text-blue-500' : 'bg-slate-50 text-slate-500'
+                          }`}>
+                            {log.action}
+                          </Badge>
+                          <span className="text-[9px] text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-600">{log.adminUsername}</span>
+                          <span className={`text-[9px] font-bold ${log.status === 'success' ? 'text-emerald-500' : log.status === 'failed' ? 'text-rose-500' : 'text-amber-500'}`}>
+                            {log.status.toUpperCase()}
+                          </span>
+                        </div>
+                        {log.details && <p className="text-[9px] text-slate-400 font-mono break-all line-clamp-2">{log.details}</p>}
+                      </div>
+                    ))}
+                    {(!deployInfo?.logs || deployInfo.logs.length === 0) && (
+                      <div className="h-40 flex items-center justify-center text-slate-300 italic text-xs">No logs yet</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
-        
         <footer className="flex flex-col items-center gap-4 pt-12 pb-10 opacity-30">
           <div className="flex items-center gap-6"><div className="h-[1px] w-20 bg-slate-300"></div><span className="font-serif italic text-slate-400 tracking-widest text-sm">{t("finis")}</span><div className="h-[1px] w-20 bg-slate-300"></div></div>
           <p className="text-[8px] uppercase tracking-[0.4em] font-black text-slate-400">{t("secureFooter")}</p>

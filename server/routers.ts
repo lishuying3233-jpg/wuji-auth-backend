@@ -359,6 +359,90 @@ export const appRouter = router({
         }
         return { success: true };
       }),
+  }),
+
+  // 发布中心接口
+  deploy: router({
+    // 获取版本对比信息
+    getVersions: protectedProcedure.query(async ({ ctx }) => {
+      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可访问发布中心" });
+      
+      const currentVersion = process.env.MANUS_VERSION || "unknown";
+      let latestCommit = null;
+      
+      try {
+        const response = await fetch("https://api.github.com/repos/lishuying3233-jpg/wuji-auth-backend/commits/main", {
+          headers: { "Accept": "application/vnd.github.v3+json" }
+        });
+        if (response.ok) {
+          const data: any = await response.json();
+          latestCommit = {
+            sha: data.sha,
+            message: data.commit.message,
+            author: data.commit.author.name,
+            date: data.commit.author.date
+          };
+        }
+      } catch (e) {
+        console.error("Failed to fetch GitHub commits:", e);
+      }
+
+      const logs = await db.getDeployLogs();
+      
+      return {
+        currentVersion,
+        latestCommit,
+        logs
+      };
+    }),
+
+    // 运行测试
+    runTests: protectedProcedure.mutation(async ({ ctx }) => {
+      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可运行测试" });
+      
+      const { execSync } = await import("child_process");
+      try {
+        // 在沙盒中运行 vitest
+        const output = execSync("cd /home/ubuntu/wuji-auth-backend && pnpm vitest run --reporter=json", { encoding: 'utf-8' });
+        const results = JSON.parse(output);
+        
+        await db.createDeployLog({
+          adminId: (ctx.user as any).id,
+          adminUsername: (ctx.user as any).username,
+          action: 'test',
+          status: results.success ? 'success' : 'failed',
+          details: `Tests passed: ${results.numPassedTests}/${results.numTotalTests}`
+        });
+
+        return { success: results.success, results };
+      } catch (e: any) {
+        const details = e.stdout || e.message;
+        await db.createDeployLog({
+          adminId: (ctx.user as any).id,
+          adminUsername: (ctx.user as any).username,
+          action: 'test',
+          status: 'failed',
+          details: details.slice(0, 1000)
+        });
+        return { success: false, error: "测试未通过", details };
+      }
+    }),
+
+    // 同步并部署 (仅记录，实际部署由 Manus Agent 完成)
+    syncAndDeploy: protectedProcedure.mutation(async ({ ctx }) => {
+      if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可执行同步部署" });
+      
+      // 这里我们仅记录意图，因为真正的部署需要 Agent 调用 webdev_save_checkpoint
+      await db.createDeployLog({
+        adminId: (ctx.user as any).id,
+        adminUsername: (ctx.user as any).username,
+        action: 'deploy',
+        status: 'pending',
+        details: "用户触发了同步部署请求，请 Agent 执行同步并发布。"
+      });
+
+      return { success: true, message: "同步请求已记录，请告知 Manus 执行部署。" };
+    })
   })
 });
 

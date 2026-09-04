@@ -64,6 +64,13 @@
       "when": 1788133800000,
       "tag": "0008_remove_duration_default",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788245837821,
+      "tag": "0009_normal_magneto",
+      "breakpoints": true
     }
   ]
 }

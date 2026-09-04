@@ -398,3 +398,26 @@ export async function updateTelegramSettings(data: {
     });
   }
 }
+
+// Deploy Logs Helpers
+export async function createDeployLog(data: {
+  adminId: number;
+  adminUsername: string;
+  action: string;
+  status: 'pending' | 'success' | 'failed';
+  githubCommit?: string;
+  versionId?: string;
+  details?: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  const { deployLogs } = await import("../drizzle/schema");
+  await db.insert(deployLogs).values(data);
+}
+
+export async function getDeployLogs() {
+  const db = await getDb();
+  if (!db) return [];
+  const { deployLogs } = await import("../drizzle/schema");
+  return await db.select().from(deployLogs).orderBy(desc(deployLogs.createdAt)).limit(50);
+}

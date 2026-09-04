@@ -85,3 +85,15 @@ export const telegramSettings = mysqlTable("telegram_settings", {
   isEnabled: int("isEnabled").default(0).notNull(), // 0: disabled, 1: enabled
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
+
+export const deployLogs = mysqlTable("deploy_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  adminId: int("adminId").notNull(),
+  adminUsername: varchar("adminUsername", { length: 64 }).notNull(),
+  action: varchar("action", { length: 64 }).notNull(), // 'sync', 'test', 'deploy'
+  status: mysqlEnum("status", ["pending", "success", "failed"]).notNull(),
+  githubCommit: varchar("githubCommit", { length: 64 }),
+  versionId: varchar("versionId", { length: 64 }),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
