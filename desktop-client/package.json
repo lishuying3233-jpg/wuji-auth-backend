@@ -1,0 +1,88 @@
+{
+  "name": "m7-social-media-assistant-desktop",
+  "version": "0.1.10",
+  "private": true,
+  "description": "M7社媒助手社交媒体内容发布桌面工作台",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "build": "vite build && electron-builder",
+    "typecheck": "tsc --noEmit",
+    "worker": "python python_worker/run.py",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "axios": "latest",
+    "electron-updater": "^6.8.9",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "recharts": "latest",
+    "sonner": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "concurrently": "latest",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "typescript": "latest",
+    "wait-on": "latest"
+  },
+  "build": {
+    "appId": "com.wujiassistant.desktop",
+    "productName": "M7社媒助手",
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "lishuying3233-jpg",
+        "repo": "wuji-assistant",
+        "releaseType": "release"
+      }
+    ],
+    "icon": "assets/icon.png",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "config/**/*",
+      "data/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "python_worker",
+        "to": "python_worker"
+      },
+      {
+        "from": "runtime/python-embed",
+        "to": "runtime/python-embed",
+        "filter": [
+          "**/*",
+          "!site-packages/**/*.pyc"
+        ]
+      },
+      {
+        "from": "assets",
+        "to": "assets"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png",
+      "artifactName": "m7-social-media-assistant-setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "M7社媒助手"
+    }
+  }
+}
