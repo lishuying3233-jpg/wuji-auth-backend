@@ -24,6 +24,10 @@ contextBridge.exposeInMainWorld('bitpost', {
   checkForUpdate: () => ipcRenderer.invoke('update-check'),
   downloadUpdate: () => ipcRenderer.invoke('update-download'),
   installUpdate: () => ipcRenderer.invoke('update-install'),
-  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_, status) => callback(status)),
+  onUpdateStatus: (callback) => {
+    const listener = (_, status) => callback(status);
+    ipcRenderer.on('update-status', listener);
+    return () => ipcRenderer.removeListener('update-status', listener);
+  },
   request: (path, options = {}) => ipcRenderer.invoke('api-request', path, options)
 });
