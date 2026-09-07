@@ -36,7 +36,10 @@ export default function AdminPage() {
   const [newAdminPass, setNewAdminPass] = useState("");
   const [newAdminRole, setNewAdminRole] = useState<"super" | "sub">("sub");
   const [newAdminPerms, setNewAdminPerms] = useState<string[]>(["generate", "renew"]);
-  const supportedDurations = new Set(["1", "3", "7", "30", "90", "365"]);
+  const isValidDuration = (value: string) => {
+    const days = Number(value.trim());
+    return Number.isSafeInteger(days) && days > 0;
+  };
 
   const utils = trpc.useUtils();
   const { data: codes, isLoading, refetch } = trpc.activation.list.useQuery({ query });
@@ -93,7 +96,7 @@ export default function AdminPage() {
       setGenerationError(t("invalidPrefix"));
       return;
     }
-    if (!supportedDurations.has(duration)) {
+    if (!isValidDuration(duration)) {
       generationInFlight.current = false;
       setGenerationError(t("invalidDuration"));
       return;
@@ -290,8 +293,8 @@ export default function AdminPage() {
     );
     if (input === null) return;
     const durationDays = Number(input.trim());
-    if (!supportedDurations.has(String(durationDays))) {
-      toast.error("请输入 1、3、7、30、90 或 365。");
+    if (!isValidDuration(input)) {
+      toast.error("请输入大于0的整数天数。");
       return;
     }
     correctDurationMutation.mutate({ id, durationDays });

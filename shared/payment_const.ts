@@ -18,7 +18,8 @@ export const PLANS = [
 export const LICENSE_DURATION_DAYS = PLANS.map((plan) => plan.durationDays) as readonly number[];
 
 export function isSupportedPlanDuration(durationDays: number): boolean {
-  return Number.isInteger(durationDays) && LICENSE_DURATION_DAYS.includes(durationDays);
+  // 标准套餐仍用于名称和价格映射，但授权期限允许任意正整数天数。
+  return Number.isSafeInteger(durationDays) && durationDays > 0;
 }
 
 /**

@@ -20,11 +20,13 @@ describe("subscription plan mapping", () => {
     expect(getPlanNameByDuration(undefined)).toBe("未知套餐");
   });
 
-  it("accepts only durations listed in the canonical plan catalog", () => {
+  it("accepts any positive safe integer duration while rejecting invalid values", () => {
     expect(LICENSE_DURATION_DAYS).toEqual([1, 3, 7, 30, 90, 365]);
     expect(isSupportedPlanDuration(3)).toBe(true);
-    expect(isSupportedPlanDuration(365)).toBe(true);
-    expect(isSupportedPlanDuration(14)).toBe(false);
+    expect(isSupportedPlanDuration(14)).toBe(true);
+    expect(isSupportedPlanDuration(1000)).toBe(true);
+    expect(isSupportedPlanDuration(0)).toBe(false);
+    expect(isSupportedPlanDuration(-1)).toBe(false);
     expect(isSupportedPlanDuration(3.5)).toBe(false);
   });
 });
