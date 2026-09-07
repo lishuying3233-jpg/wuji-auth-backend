@@ -78,6 +78,9 @@
       "artifactName": "m7-social-media-assistant-setup-${version}.${ext}"
     },
     "nsis": {
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
