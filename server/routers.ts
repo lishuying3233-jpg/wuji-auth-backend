@@ -400,10 +400,13 @@ export const appRouter = router({
     runTests: protectedProcedure.mutation(async ({ ctx }) => {
       if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可运行测试" });
       
-      const { execSync } = await import("child_process");
+      const { execFileSync } = await import("child_process");
       try {
-        // 在沙盒中运行 vitest
-        const output = execSync("cd /home/ubuntu/wuji-auth-backend && pnpm vitest run --reporter=json", { encoding: 'utf-8' });
+        // 使用当前服务工作目录运行 vitest，不依赖某台机器的绝对路径。
+        const output = execFileSync("pnpm", ["vitest", "run", "--reporter=json"], {
+          cwd: process.cwd(),
+          encoding: "utf-8",
+        });
         const results = JSON.parse(output);
         
         await db.createDeployLog({
