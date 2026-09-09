@@ -1,6 +1,7 @@
 {
   "provider": "github",
   "owner": "lishuying3233-jpg",
-  "repo": "wuji-auth-backend",
+  "repo": "wuji-assistant",
+  "releaseType": "release",
   "private": false
 }

@@ -1,0 +1,82 @@
+name: Build and publish desktop release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v0.1.11'
+        required: true
+        default: 'v0.1.11'
+
+permissions:
+  contents: write
+
+env:
+  DESKTOP_DIR: desktop-client
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop-client/package-lock.json
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package version
+        shell: bash
+        working-directory: desktop-client
+        run: |
+          actual="$(node -p "require('./package.json').version")"
+          expected="${{ steps.release.outputs.version }}"
+          if [ "$actual" != "$expected" ]; then
+            echo "package.json version $actual does not match release tag $expected"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: desktop-client
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: desktop-client
+        run: npm run typecheck
+
+      - name: Build Windows installer
+        working-directory: desktop-client
+        run: npm run build -- --win nsis
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: M7社媒助手 ${{ steps.release.outputs.tag }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            desktop-client/release/*.exe
+            desktop-client/release/*.blockmap
+            desktop-client/release/latest.yml

@@ -42,11 +42,11 @@
       {
         "provider": "github",
         "owner": "lishuying3233-jpg",
-        "repo": "wuji-assistant",
+        "repo": "wuji-auth-backend",
         "releaseType": "release"
       }
     ],
-    "icon": "assets/icon.png",
+    "icon": "assets/icon.ico",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -74,7 +74,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.png",
+      "icon": "assets/icon.ico",
       "artifactName": "m7-social-media-assistant-setup-${version}.${ext}"
     },
     "nsis": {
