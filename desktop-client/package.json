@@ -1,6 +1,6 @@
 {
   "name": "m7-social-media-assistant-desktop",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "M7社媒助手社交媒体内容发布桌面工作台",
   "main": "electron/main.cjs",
@@ -42,11 +42,11 @@
       {
         "provider": "github",
         "owner": "lishuying3233-jpg",
-        "repo": "wuji-auth-backend",
+        "repo": "wuji-assistant",
         "releaseType": "release"
       }
     ],
-    "icon": "assets/icon.ico",
+    "icon": "assets/icon.png",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -74,13 +74,10 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico",
+      "icon": "assets/icon.png",
       "artifactName": "m7-social-media-assistant-setup-${version}.${ext}"
     },
     "nsis": {
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

@@ -15,6 +15,7 @@ const http = require('http');
 const https = require('https');
 const net = require('net');
 const { pathToFileURL } = require('url');
+const { execFileSync } = require('child_process');
 const { decideActivationState } = require('./auth-policy.cjs');
 
 let mainWindow;
@@ -27,6 +28,37 @@ let authMonitorBusy = false;
 let activationInvalidating = false;
 let workerPausedForAuth = false;
 let selectedMediaFolder = '';
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+function scheduledTaskName(id) { return `M7SocialMediaAssistant-${String(id).replace(/[^a-zA-Z0-9_-]/g, '')}`; }
+function scheduleTaskWindows(record) {
+  if (process.platform !== 'win32' || !record?.id || !record?.scheduled_at) return { ok: true, skipped: true };
+  const date = new Date(Number(record.scheduled_at) * 1000);
+  const pad = value => String(value).padStart(2, '0');
+  const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const dateText = `${pad(date.getMonth() + 1)}/${pad(date.getDate())}/${date.getFullYear()}`;
+  const args = ['/Create', '/TN', scheduledTaskName(record.id), '/TR', `\"${process.execPath}\" --scheduled-task ${record.id}`, '/ST', time, '/F'];
+  if (record.schedule_type === 'weekly') { args.push('/SC', 'WEEKLY', '/D', (record.schedule_weekdays || []).map(day => ['MON','TUE','WED','THU','FRI','SAT','SUN'][Number(day)] || 'MON').join(',')); }
+  else if (record.schedule_type === 'daily') args.push('/SC', 'DAILY', '/MO', '1');
+  else { args.push('/SC', 'ONCE', '/SD', dateText); }
+  try { execFileSync('schtasks.exe', args, { windowsHide: true, stdio: 'ignore' }); return { ok: true, taskName: scheduledTaskName(record.id) }; }
+  catch (error) { return { ok: false, message: error?.message || String(error) }; }
+}
+function removeWindowsSchedule(id) {
+  if (process.platform !== 'win32' || !id) return { ok: true, skipped: true };
+  try { execFileSync('schtasks.exe', ['/Delete', '/TN', scheduledTaskName(id), '/F'], { windowsHide: true, stdio: 'ignore' }); } catch (_) {}
+  return { ok: true };
+}
 function mediaFolderConfigPath() { return path.join(app.getPath('userData'), 'media-folder.json'); }
 function loadMediaFolder() { try { const value = JSON.parse(fs.readFileSync(mediaFolderConfigPath(), 'utf8')); if (value && typeof value.path === 'string' && fs.existsSync(value.path) && fs.statSync(value.path).isDirectory()) selectedMediaFolder = path.normalize(value.path); } catch (_) {} }
 function saveMediaFolder(folder) { selectedMediaFolder = path.normalize(folder); try { fs.mkdirSync(path.dirname(mediaFolderConfigPath()), { recursive: true }); fs.writeFileSync(mediaFolderConfigPath(), JSON.stringify({ path: selectedMediaFolder }, null, 2), 'utf8'); } catch (_) {} }
@@ -364,6 +396,8 @@ app.whenReady().then(async () => {
     setTimeout(() => autoUpdater.quitAndInstall(false, true), 120);
     return { status: 'installing' };
   });
+  ipcMain.handle('schedule-register', (_, record) => scheduleTaskWindows(record));
+  ipcMain.handle('schedule-remove', (_, id) => removeWindowsSchedule(id));
   ipcMain.handle('pick-files', async (_, defaultPath) => { const requested = typeof defaultPath === 'string' && defaultPath.trim() ? defaultPath.trim() : selectedMediaFolder; const options = { properties: ['openFile', 'multiSelections'], filters: [{ name: '媒体文件', extensions: ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'webm', 'avi'] }] }; if (requested) { try { const candidate = path.normalize(requested); if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) { options.defaultPath = candidate; selectedMediaFolder = candidate; } } catch (_) {} } const r = await dialog.showOpenDialog(options); return r.canceled ? [] : r.filePaths; });
   ipcMain.handle('pick-folder', async () => { const r = await dialog.showOpenDialog({ properties: ['openDirectory'] }); if (r.canceled || !r.filePaths[0]) return ''; saveMediaFolder(r.filePaths[0]); return selectedMediaFolder; });
   ipcMain.handle('list-media-folder', async (_, folderPath) => { try { const root = path.normalize(String(folderPath || '')); if (!root || !fs.existsSync(root) || !fs.statSync(root).isDirectory()) return []; const allowed = new Set(['.jpg','.jpeg','.png','.gif','.webp','.mp4','.mov','.webm','.avi']); return fs.readdirSync(root, { withFileTypes: true }).filter(entry => entry.isFile() && allowed.has(path.extname(entry.name).toLowerCase())).map(entry => path.join(root, entry.name)); } catch (_) { return []; } });

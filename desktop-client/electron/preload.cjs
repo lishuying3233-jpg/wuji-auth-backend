@@ -24,10 +24,8 @@ contextBridge.exposeInMainWorld('bitpost', {
   checkForUpdate: () => ipcRenderer.invoke('update-check'),
   downloadUpdate: () => ipcRenderer.invoke('update-download'),
   installUpdate: () => ipcRenderer.invoke('update-install'),
-  onUpdateStatus: (callback) => {
-    const listener = (_, status) => callback(status);
-    ipcRenderer.on('update-status', listener);
-    return () => ipcRenderer.removeListener('update-status', listener);
-  },
+  scheduleRegister: (record) => ipcRenderer.invoke('schedule-register', record),
+  scheduleRemove: (id) => ipcRenderer.invoke('schedule-remove', id),
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', (_, status) => callback(status)),
   request: (path, options = {}) => ipcRenderer.invoke('api-request', path, options)
 });
