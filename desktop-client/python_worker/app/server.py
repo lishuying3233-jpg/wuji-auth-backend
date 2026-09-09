@@ -1384,6 +1384,8 @@ async def create_task(req: TaskRequest):
         raise HTTPException(400, '至少选择一个窗口环境')
     if req.schedule_type != 'once' and not req.scheduled_at:
         raise HTTPException(400, '重复任务必须填写首次执行时间')
+    if req.schedule_type == 'weekly' and not req.schedule_weekdays:
+        raise HTTPException(400, '每周任务至少选择一个星期几')
     task_id = uuid.uuid4().hex[:12]
     now = time.time()
     initial_status = 'scheduled' if req.scheduled_at and req.scheduled_at > now else 'running'
