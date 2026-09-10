@@ -1278,7 +1278,10 @@ async def get_task(task_id: str):
 
 async def launch_task(task_id: str) -> None:
     record = tasks.get(task_id)
-    if not record or record.get('status') in ('running', 'completed', 'cancelled'):
+    if not record or record.get('status') in ('completed', 'cancelled'):
+        return
+    existing = task_handles.get(task_id)
+    if existing and not existing.done():
         return
     record['status'] = 'running'
     record['phase'] = 'queued'
