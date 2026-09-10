@@ -64,7 +64,7 @@ jobs:
 
       - name: Build Windows installer
         working-directory: desktop-client
-        run: npm run build -- --win nsis
+        run: npm run build -- --win nsis --publish never
 
       - name: Create or update GitHub Release and upload assets
         shell: bash
