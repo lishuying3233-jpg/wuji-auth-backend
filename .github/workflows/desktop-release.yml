@@ -65,8 +65,6 @@ jobs:
       - name: Build Windows installer
         working-directory: desktop-client
         run: npm run build -- --win nsis
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create or update GitHub Release and upload assets
         shell: bash

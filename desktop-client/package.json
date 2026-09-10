@@ -1,6 +1,6 @@
 {
   "name": "m7-social-media-assistant-desktop",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "description": "M7社媒助手社交媒体内容发布桌面工作台",
   "main": "electron/main.cjs",
