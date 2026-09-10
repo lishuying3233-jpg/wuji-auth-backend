@@ -16,6 +16,16 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from ..facebook_publisher import publish_to_facebook, FacebookPublishError, PUBLISHER_VERSION
 
+# Electron 日志通道统一使用 UTF-8，避免 Windows 默认代码页导致中文乱码。
+try:
+    import sys
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
+
 BIT_BASE = os.getenv('BITBROWSER_BASE', 'http://127.0.0.1:54345').rstrip('/')
 DATA_DIR = Path(__file__).resolve().parents[2] / 'data'
 DATA_DIR.mkdir(exist_ok=True)

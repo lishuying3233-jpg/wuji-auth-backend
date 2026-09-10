@@ -320,15 +320,17 @@ function startWorker() {
     worker = spawn(item.cmd, item.args, {
       cwd: root,
       windowsHide: true,
-      env: { ...process.env, WUJI_API_PORT: String(apiPort), WUJI_API_BASE: API }
+      env: { ...process.env, WUJI_API_PORT: String(apiPort), WUJI_API_BASE: API, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' }
     });
     let spawned = false;
     worker.once('spawn', () => {
       spawned = true;
       mainWindow?.webContents.send('worker-log', `[worker] 已启动：${item.cmd}，服务地址 ${API}`);
     });
-    worker.stdout.on('data', data => mainWindow?.webContents.send('worker-log', data.toString()));
-    worker.stderr.on('data', data => mainWindow?.webContents.send('worker-log', `[worker-error] ${data}`));
+    worker.stdout.setEncoding('utf8');
+    worker.stderr.setEncoding('utf8');
+    worker.stdout.on('data', data => mainWindow?.webContents.send('worker-log', String(data)));
+    worker.stderr.on('data', data => mainWindow?.webContents.send('worker-log', `[worker-error] ${String(data)}`));
     worker.once('error', () => { if (!spawned) launch(index + 1); });
     worker.once('exit', (code) => {
       if (quitting || workerPausedForAuth) return;
