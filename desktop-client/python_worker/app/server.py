@@ -343,6 +343,8 @@ class MetricsRequest(BaseModel):
     comments: int | None = Field(default=None, ge=0)
 
 
+class RetryRequest(BaseModel):
+    profile_ids: list[str] | None = None
 class TaskRequest(BaseModel):
     profile_ids: list[str]
     content_by_profile: dict[str, Content] = Field(default_factory=dict)
@@ -1410,7 +1412,7 @@ async def create_task(req: TaskRequest):
     return tasks[task_id]
 
 @app.post('/tasks/{task_id}/retry')
-async def retry_task(task_id: str):
+async def retry_task(task_id: str, retry: RetryRequest | None = None):
     source = tasks.get(task_id)
     if not source:
         raise HTTPException(404, '任务不存在')
@@ -1418,6 +1420,16 @@ async def retry_task(task_id: str):
     if not req_data:
         raise HTTPException(400, '该历史任务没有可重发的文案和素材')
     req_data = dict(req_data)
+    selected_ids = [str(item) for item in (retry.profile_ids if retry and retry.profile_ids else req_data.get('profile_ids', []))]
+    if not selected_ids:
+        raise HTTPException(400, '没有可重发的窗口')
+    available = {str(item) for item in req_data.get('profile_ids', [])}
+    invalid = [item for item in selected_ids if item not in available]
+    if invalid:
+        raise HTTPException(400, f'窗口不属于原任务：{invalid[0]}')
+    req_data['profile_ids'] = selected_ids
+    content_map = req_data.get('content_by_profile') or {}
+    req_data['content_by_profile'] = {item: content_map[item] for item in selected_ids if item in content_map}
     req_data['scheduled_at'] = None
     req_data['schedule_type'] = 'once'
     req_data['schedule_weekdays'] = []
