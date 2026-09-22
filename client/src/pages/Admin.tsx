@@ -905,12 +905,12 @@ export default function AdminPage() {
                       ) : deployInfo?.latestCommit ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <code className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-mono">{deployInfo.latestCommit.sha.slice(0, 7)}</code>
-                            <span className="text-xs font-medium text-slate-700 truncate">{deployInfo.latestCommit.message}</span>
+                            <code className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-mono">{(deployInfo.latestCommit as any).sha.slice(0, 7)}</code>
+                            <span className="text-xs font-medium text-slate-700 truncate">{(deployInfo.latestCommit as any).message}</span>
                           </div>
                           <div className="flex items-center justify-between text-[10px] text-slate-400">
-                            <span>{deployInfo.latestCommit.author}</span>
-                            <span>{new Date(deployInfo.latestCommit.date).toLocaleString()}</span>
+                            <span>{(deployInfo.latestCommit as any).author}</span>
+                            <span>{new Date((deployInfo.latestCommit as any).date).toLocaleString()}</span>
                           </div>
                         </div>
                       ) : (

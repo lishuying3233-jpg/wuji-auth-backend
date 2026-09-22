@@ -8,7 +8,7 @@ export async function processPendingOrders() {
   if (orders.length === 0) return;
 
   const settings = await db.getPaymentSettings();
-  const addressMap = new Map(settings.map(s => [`${s.network}`, s.address]));
+  const addressMap = new Map<string, string>(settings.map(s => [String(s.network), String(s.address)]));
 
   for (const order of orders) {
     if (!order.txHash) continue;
@@ -29,7 +29,7 @@ export async function processPendingOrders() {
         order.network as "ERC20" | "TRC20",
         order.txHash,
         recipientAddress,
-        order.amount
+        String(order.amount)
       );
 
       if (result.success && result.confirmed) {

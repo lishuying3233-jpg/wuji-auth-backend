@@ -78,7 +78,7 @@ export const appRouter = router({
         count: z.number().int().min(1).max(50).default(1)
       }))
       .mutation(async ({ input }) => {
-        const results = [];
+        const results: string[] = [];
         let prefix = (input.prefix || "").trim().toUpperCase();
 
         // 未填写前缀时使用默认随机前缀；非法字符已经由 Zod schema 拒绝
@@ -263,7 +263,7 @@ export const appRouter = router({
         durationDays: z.number()
       }))
       .mutation(async ({ input }) => {
-        let activationCode = undefined;
+        let activationCode: string | undefined = undefined;
         if (input.status === 'completed') {
           // 修正逻辑：设备码后三位仅作为前缀
           const prefix = input.machineId.slice(-3).toUpperCase();
@@ -368,7 +368,7 @@ export const appRouter = router({
       if ((ctx.user as any)?.role !== 'super') throw new TRPCError({ code: "FORBIDDEN", message: "仅主管理员可访问发布中心" });
       
       const currentVersion = process.env.MANUS_VERSION || "unknown";
-      let latestCommit = null;
+      let latestCommit: { sha: string; message: string; author: string; date: string } | null = null;
       
       try {
         const response = await fetch("https://api.github.com/repos/lishuying3233-jpg/wuji-auth-backend/commits/main", {
