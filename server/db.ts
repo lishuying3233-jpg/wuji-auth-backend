@@ -1,18 +1,78 @@
 import { eq, desc, and, like, or, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { createConnection, type Connection } from "mysql2/promise";
 import { InsertUser, users, activationCodes, InsertActivationCode, admins, InsertAdmin, paymentSettings, orders, telegramSettings } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-let _db: ReturnType<typeof drizzle> | null = null;
+type HyperdriveBinding = {
+  host: string;
+  user: string;
+  password: string;
+  database: string;
+  port: number;
+};
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+let _db: any = null;
+let _dbSource: 'hyperdrive' | 'database-url' | '' = '';
+let _hyperdriveConnection: Connection | null = null;
+
+async function getHyperdriveBinding(): Promise<HyperdriveBinding | null> {
+  try {
+    // Cloudflare Workers exposes bindings through cloudflare:workers.
+    // Local Node.js builds do not provide this module, so fall back below.
+    const cloudflareWorkers = await import("cloudflare:workers") as {
+      env?: Record<string, unknown>;
+    };
+    const binding = cloudflareWorkers.env?.HYPERDRIVE as Partial<HyperdriveBinding> | undefined;
+    if (!binding?.host || !binding.user || !binding.password || !binding.database || !binding.port) {
+      return null;
+    }
+    return {
+      host: binding.host,
+      user: binding.user,
+      password: binding.password,
+      database: binding.database,
+      port: Number(binding.port),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+// Production uses the existing Aiven MySQL database through Hyperdrive.
+// Local development, tests, and Drizzle migrations continue to use DATABASE_URL.
 export async function getDb() {
+  const hyperdrive = await getHyperdriveBinding();
+  if (hyperdrive && _dbSource !== 'hyperdrive') {
+    try {
+      _hyperdriveConnection = await createConnection({
+        host: hyperdrive.host,
+        user: hyperdrive.user,
+        password: hyperdrive.password,
+        database: hyperdrive.database,
+        port: hyperdrive.port,
+        disableEval: true,
+      });
+      _db = drizzle({ client: _hyperdriveConnection });
+      _dbSource = 'hyperdrive';
+      console.log('[Database] Connected through Cloudflare Hyperdrive');
+      return _db;
+    } catch (error) {
+      console.warn('[Database] Hyperdrive connection failed:', error);
+      _hyperdriveConnection = null;
+      _db = null;
+      _dbSource = '';
+    }
+  }
+
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);
+      _dbSource = 'database-url';
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn('[Database] Failed to connect:', error);
       _db = null;
+      _dbSource = '';
     }
   }
   return _db;
