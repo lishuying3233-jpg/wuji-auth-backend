@@ -434,14 +434,17 @@ app.whenReady().then(async () => {
     const activationCode = typeof requestedCode === 'string' && requestedCode.trim()
       ? requestedCode.trim().toUpperCase()
       : readStoredActivationCode();
-    const subscriptionInput = { machineId: mid, ...(activationCode ? { activationCode } : {}) };
+    if (!activationCode) {
+      return { active: false, status: 'not_activated', reason: '尚未输入激活码' };
+    }
+    const subscriptionInput = { machineId: mid, activationCode };
     try {
       console.log('[auth] subscription request', {
         activationSuffix: activationCode ? activationCode.slice(-4) : '(none)',
         machineSuffix: mid.slice(-4),
       });
       const response = await axios.get(`${AUTH_SERVER_URL}/payment.getSubscription?batch=1&input=${encodeURIComponent(JSON.stringify({ "0": { json: subscriptionInput } }))}`);
-      const subscription = response.data?.[0]?.result?.data?.json || { active: false };
+      const subscription = response.data?.[0]?.result?.data?.json || { active: false, status: 'invalid_response', reason: '授权服务器返回异常' };
       console.log('[auth] subscription response', {
         active: subscription.active,
         durationDays: subscription.durationDays,
@@ -450,7 +453,8 @@ app.whenReady().then(async () => {
       });
       return subscription;
     } catch (e) {
-      return { active: false, error: e.message };
+      const status = e?.response ? 'server_unavailable' : 'network_error';
+      return { active: false, status, error: e.message, reason: '授权服务器暂时不可用' };
     }
   });
 

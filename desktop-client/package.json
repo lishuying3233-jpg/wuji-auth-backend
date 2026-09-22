@@ -46,7 +46,7 @@
         "releaseType": "release"
       }
     ],
-    "icon": "assets/icon.ico",
+    "icon": "assets/icon.png",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -74,13 +74,13 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico",
+      "icon": "assets/icon.png",
       "artifactName": "m7-social-media-assistant-setup-${version}.${ext}"
     },
     "nsis": {
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
+      "installerIcon": "assets/icon.png",
+      "uninstallerIcon": "assets/icon.png",
+      "installerHeaderIcon": "assets/icon.png",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

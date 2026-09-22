@@ -229,9 +229,30 @@ export const appRouter = router({
         // 激活码本身是唯一键；auth.verify 已负责校验并绑定机器。
         // 订阅展示按激活码直接读取，避免机器码格式差异影响套餐返回。
         const code = await db.getActivationCodeByCode(input.activationCode.toUpperCase());
-        if (!code) return { active: false };
+        if (!code) return { active: false, status: "not_found", reason: "激活码不存在" };
+        if (code.status !== 'active') {
+          return {
+            active: false,
+            status: "disabled",
+            reason: "激活码已被停用",
+            expiresAt: code.expiresAt?.getTime() ?? null,
+            durationDays: code.durationDays,
+            planName: getPlanNameByDuration(code.durationDays),
+          };
+        }
+        if (code.expiresAt && code.expiresAt.getTime() <= Date.now()) {
+          return {
+            active: false,
+            status: "expired",
+            reason: "激活码已过期",
+            expiresAt: code.expiresAt.getTime(),
+            durationDays: code.durationDays,
+            planName: getPlanNameByDuration(code.durationDays),
+          };
+        }
         return {
-          active: code.status === 'active' && (!code.expiresAt || code.expiresAt.getTime() > Date.now()),
+          active: true,
+          status: "active",
           expiresAt: code.expiresAt?.getTime() ?? null,
           durationDays: code.durationDays,
           planName: getPlanNameByDuration(code.durationDays)
