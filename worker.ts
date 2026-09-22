@@ -10,8 +10,28 @@ import { processPendingOrders } from "./server/order_worker";
 import { sdk } from "./server/_core/sdk";
 
 const app = express();
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ limit: "50mb", extended: true }));
+// Avoid Express body-parser in Workers: body-parser pulls iconv-lite/raw-body,
+// which is not compatible with the Workers runtime bundle.
+app.use(async (req: any, _res, next) => {
+  const method = String(req.method || "").toUpperCase();
+  const contentType = String(req.headers?.["content-type"] || "").toLowerCase();
+  if (method === "GET" || method === "HEAD" || (!contentType.includes("application/json") && !contentType.includes("application/x-www-form-urlencoded"))) {
+    return next();
+  }
+  try {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of req) chunks.push(typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk);
+    const bytes = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+    const body = new Uint8Array(bytes);
+    let offset = 0;
+    for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
+    const text = new TextDecoder().decode(body);
+    req.body = contentType.includes("application/json") ? (text ? JSON.parse(text) : {}) : Object.fromEntries(new URLSearchParams(text));
+    next();
+  } catch (error) {
+    _res.status(400).json({ error: "Invalid request body" });
+  }
+});
 registerStorageProxy(app);
 registerOAuthRoutes(app);
 
