@@ -54,7 +54,18 @@ const expressHandler = httpServerHandler({ port: 3000 });
 
 export default {
   async fetch(request: Request, workerEnv: { ASSETS: { fetch(request: Request): Promise<Response> } }, ctx: ExecutionContext) {
-    if (!new URL(request.url).pathname.startsWith("/api/")) return workerEnv.ASSETS.fetch(request);
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) {
+      const assetResponse = await workerEnv.ASSETS.fetch(request);
+      // React Router/Wouter uses client-side routes. Cloudflare Assets only
+      // knows about real files, so serve index.html for missing GET routes.
+      if (assetResponse.status === 404 && request.method === "GET") {
+        const indexUrl = new URL(request.url);
+        indexUrl.pathname = "/index.html";
+        return workerEnv.ASSETS.fetch(new Request(indexUrl, request));
+      }
+      return assetResponse;
+    }
     return expressHandler.fetch(request, workerEnv, ctx);
   },
 };
