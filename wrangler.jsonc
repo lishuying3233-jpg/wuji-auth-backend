@@ -25,5 +25,8 @@
       "binding": "HYPERDRIVE",
       "id": "35c1507b7199490e82c22129cda0a477"
     }
-  ]
+  ],
+  "alias": {
+    "body-parser": "./worker-shims/body-parser.ts"
+  }
 }
